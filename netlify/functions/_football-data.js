@@ -588,7 +588,13 @@ function sortMatches(matches) {
   });
 }
 
+const allMatchesCache = { time: 0, data: null };
+const ALL_MATCHES_TTL = 90 * 1000;
+
 async function getAllMatches() {
+  if (allMatchesCache.data && Date.now() - allMatchesCache.time < ALL_MATCHES_TTL) {
+    return { ...allMatchesCache.data, cached: true };
+  }
   const errors = [];
   let matches = [];
   const compHtmls = [];
@@ -627,7 +633,10 @@ async function getAllMatches() {
     errors.push(`Úrslit.net: ${err.message}`);
   }
 
-  return { matches: sortMatches(uniqueMatches(matches.filter(isAllowedMatch))), errors };
+  const data = { matches: sortMatches(uniqueMatches(matches.filter(isAllowedMatch))), errors, cached: false };
+  allMatchesCache.time = Date.now();
+  allMatchesCache.data = data;
+  return data;
 }
 
 function emptyTeam(team) {

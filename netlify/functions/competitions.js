@@ -7,7 +7,7 @@ exports.handler = async () => {
     return {
       statusCode: 200,
       headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=300, s-maxage=600' },
-      body: JSON.stringify({ ok: true, version: '1.1.0', updatedAt: new Date().toISOString(), errors, competitions })
+      body: JSON.stringify({ ok: true, version: '2.5.0', updatedAt: new Date().toISOString(), errors, competitions })
     };
   } catch (err) {
     return { statusCode: 500, headers: { 'content-type': 'application/json; charset=utf-8' }, body: JSON.stringify({ ok: false, error: err.message }) };

@@ -7,11 +7,11 @@ exports.handler = async () => {
       statusCode: 200,
       headers: {
         'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'public, max-age=120, s-maxage=180'
+        'cache-control': 'public, max-age=90, s-maxage=120'
       },
       body: JSON.stringify({
         ok: true,
-        version: '1.8.0',
+        version: '2.5.0',
         updatedAt: new Date().toISOString(),
         count: matches.length,
         sources: SOURCES,
