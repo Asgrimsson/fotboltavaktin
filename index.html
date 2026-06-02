@@ -13,18 +13,16 @@
     <header class="hero">
       <div class="hero-top">
         <div class="brand">
-          <div class="ball">⚽</div>
+          <div class="ball" aria-hidden="true">⚽</div>
           <div>
-            <p class="eyebrow">Íslenski boltinn</p>
+            <p class="eyebrow">Íslenski boltinn · v0.3</p>
             <h1>Fótboltavaktin</h1>
           </div>
         </div>
         <button id="refreshBtn" class="ghost-btn" type="button">Uppfæra</button>
       </div>
-      <p class="lead">Leikir í dag, leikir í gangi og næstu leikir úr íslenskum fótbolta.</p>
-      <div class="status-strip" id="statusStrip">
-        <span>Hleð gögn…</span>
-      </div>
+      <p class="lead">Leikir, Match Center, opinberar KSÍ töflur og deildaryfirlit í farsímavænu PWA appi.</p>
+      <div class="status-strip" id="statusStrip"><span>Hleð gögn…</span></div>
     </header>
 
     <main>
@@ -33,6 +31,7 @@
           <button class="tab active" data-filter="now">Í gangi</button>
           <button class="tab" data-filter="today">Í dag</button>
           <button class="tab" data-filter="upcoming">Næst</button>
+          <button class="tab" data-filter="results">Úrslit</button>
           <button class="tab" data-filter="all">Allt</button>
           <button class="tab" data-filter="mine">Mín lið</button>
         </div>
@@ -48,12 +47,15 @@
         </div>
       </section>
 
-      <section class="summary-grid" id="summaryGrid" aria-live="polite">
+      <section class="summary-grid" aria-live="polite">
         <article class="metric"><strong id="metricNow">0</strong><span>í gangi</span></article>
         <article class="metric"><strong id="metricToday">0</strong><span>í dag</span></article>
+        <article class="metric"><strong id="metricResults">0</strong><span>úrslit</span></article>
         <article class="metric"><strong id="metricTotal">0</strong><span>leikir sóttir</span></article>
       </section>
 
+      <section class="league-strip" id="leagueStrip" aria-label="Deildir"></section>
+      <section class="competition-overview" id="competitionOverview" aria-live="polite"></section>
       <section class="cards" id="cards" aria-live="polite"></section>
       <section class="empty hidden" id="emptyState">
         <div>🔎</div>
@@ -63,22 +65,34 @@
     </main>
   </div>
 
+  <dialog id="matchDialog" class="match-dialog">
+    <div class="dialog-inner">
+      <button class="dialog-close" id="closeDialog" type="button" aria-label="Loka">×</button>
+      <div id="detailContent" class="detail-content"></div>
+    </div>
+  </dialog>
+
   <template id="matchTemplate">
     <article class="match-card">
-      <div class="match-main">
-        <div class="time-block">
-          <span class="status-pill"></span>
-          <strong class="time"></strong>
-          <small class="date"></small>
+      <button class="match-open" type="button">
+        <div class="match-main">
+          <div class="time-block">
+            <span class="status-pill"></span>
+            <strong class="time"></strong>
+            <small class="date"></small>
+          </div>
+          <div class="teams">
+            <h2><span class="home"></span><span class="score-inline"></span><span class="dash">–</span><span class="away"></span></h2>
+            <p class="meta"></p>
+          </div>
         </div>
-        <div class="teams">
-          <h2><span class="home"></span><span class="dash">–</span><span class="away"></span></h2>
-          <p class="meta"></p>
-        </div>
-      </div>
+      </button>
       <div class="match-footer">
         <span class="source"></span>
-        <a class="source-link" target="_blank" rel="noopener noreferrer">Opna heimild</a>
+        <div class="footer-actions">
+          <button class="mini-btn detail-btn" type="button">Opna Match Center</button>
+          <a class="source-link" target="_blank" rel="noopener noreferrer">Heimild</a>
+        </div>
       </div>
     </article>
   </template>

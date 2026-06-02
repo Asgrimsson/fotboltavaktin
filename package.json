@@ -1,8 +1,8 @@
 {
   "name": "fotboltavaktin",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Netlify-ready PWA sem sýnir íslenska fótboltaleiki frá opinberum vefgögnum.",
+  "description": "Netlify-ready PWA með leikjalista, Match Center, opinberum KSÍ stöðutöflum, Match Center og deildaryfirliti.",
   "scripts": {
     "dev": "netlify dev",
     "build": "echo 'Static app - no build step'"
