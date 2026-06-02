@@ -1,4 +1,4 @@
-const { getAllMatches, getBestCompetitionTable, teamStats, smartFacts } = require('./_football-data');
+const { getAllMatches, getBestCompetitionTable, teamStats, smartFacts, getMatchReport } = require('./_football-data');
 
 exports.handler = async (event) => {
   try {
@@ -13,13 +13,7 @@ exports.handler = async (event) => {
     const homeStats = teamStats(table, match.home);
     const awayStats = teamStats(table, match.away);
 
-    const report = {
-      available: false,
-      message: 'Leikskýrsla/dómarar eru næsta gagnaskref. Í v0.3 er áherslan á opinberar KSÍ stöðutöflur og deildaryfirlit.',
-      referee: '',
-      assistants: [],
-      events: []
-    };
+    const report = await getMatchReport(match);
 
     return {
       statusCode: 200,

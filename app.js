@@ -7,7 +7,10 @@ const state = {
   favoriteLeagues: JSON.parse(localStorage.getItem('fotboltavaktin.leagues') || '[]'),
   updatedAt: null,
   errors: [],
-  competitions: []
+  competitions: [],
+  theme: localStorage.getItem('fotboltavaktin.theme') || 'dark',
+  lastSnapshot: JSON.parse(localStorage.getItem('fotboltavaktin.scoreSnapshot') || '{}'),
+  installPrompt: null
 };
 
 const els = {
@@ -28,7 +31,10 @@ const els = {
   metricToday: document.querySelector('#metricToday'),
   metricResults: document.querySelector('#metricResults'),
   metricTotal: document.querySelector('#metricTotal'),
-  competitionOverview: document.querySelector('#competitionOverview')
+  competitionOverview: document.querySelector('#competitionOverview'),
+  toastStack: document.querySelector('#toastStack'),
+  themeBtn: document.querySelector('#themeBtn'),
+  installBtn: document.querySelector('#installBtn')
 };
 
 function escapeHtml(value) {
@@ -238,7 +244,7 @@ function renderWatchDashboard() {
     return;
   }
   els.watchDashboard.innerHTML = `
-    <div class="section-heading compact-heading"><div><p class="eyebrow">v0.4</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
+    <div class="section-heading compact-heading"><div><p class="eyebrow">v0.7</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
     <div class="watch-grid">
       <article class="watch-card live"><strong>${live.length}</strong><span>í gangi hjá mínum liðum/deildum</span></article>
       <article class="watch-card"><strong>${today.length}</strong><span>í dag í minni vakt</span></article>
@@ -253,7 +259,7 @@ function renderCompetitions() {
   const items = state.competitions.length ? state.competitions : Array.from(new Map(state.matches.map(m => [m.competitionKey, { key: m.competitionKey, name: m.competition, matchCount: 1, resultCount: hasScore(m) ? 1 : 0, upcomingCount: hasScore(m) ? 0 : 1, liveCount: m.status === 'í gangi' ? 1 : 0, hasOfficialLink: Boolean(m.competitionUrl), url: m.competitionUrl, id: m.competitionId }])).values()).filter(x => x.key && x.name);
   if (!items.length) { els.competitionOverview.innerHTML = ''; return; }
   els.competitionOverview.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">v0.4</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
+    <div class="section-heading"><div><p class="eyebrow">v0.7</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
     <div class="competition-grid">${items.slice(0, 18).map(item => `
       <article class="competition-card">
         <div><h3>${escapeHtml(item.name)}</h3><p>${item.matchCount || 0} leikir · ${item.resultCount || 0} úrslit · ${item.upcomingCount || 0} framundan</p></div>
@@ -313,17 +319,10 @@ async function openMatch(id) {
         <p class="data-note">Skoruð mörk og fengin mörk koma úr opinberri KSÍ töflu ef hún fannst, annars úr reiknaðri varatöflu.</p>
       </section>
       <section data-panel="report" class="hidden">
-        <div class="report-card">
-          <h3>Leikskýrsla</h3>
-          <p>${escapeHtml(data.report.message)}</p>
-          <ul>
-            <li>Dómari: ${escapeHtml(data.report.referee || 'ekki tiltækt í v0.3')}</li>
-            <li>Atburðir: ${data.report.events?.length || 0}</li>
-            <li>Staða: undirbúið fyrir KSÍ/COMET leikskýrslu í næstu útgáfu</li>
-          </ul>
-        </div>
+        ${reportMarkup(data.report, m)}
       </section>`;
     els.detail.querySelectorAll('[data-detail-tab]').forEach(btn => btn.addEventListener('click', () => setDetailTab(btn.dataset.detailTab)));
+    setupDetailSwipe();
   } catch (err) {
     els.detail.innerHTML = `<div class="loading error">${escapeHtml(err.message)}</div>`;
   }
@@ -395,6 +394,94 @@ async function openCompetition(meta) {
   }
 }
 
+
+function applyTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  if (els.themeBtn) els.themeBtn.textContent = state.theme === 'light' ? 'Dökk stilling' : 'Ljós stilling';
+  localStorage.setItem('fotboltavaktin.theme', state.theme);
+}
+function showToast(title, body = '') {
+  if (!els.toastStack) return;
+  const item = document.createElement('div');
+  item.className = 'toast-item';
+  item.innerHTML = `<strong>${escapeHtml(title)}</strong>${body ? `<span>${escapeHtml(body)}</span>` : ''}`;
+  els.toastStack.appendChild(item);
+  setTimeout(() => item.classList.add('show'), 20);
+  setTimeout(() => { item.classList.remove('show'); setTimeout(() => item.remove(), 300); }, 7000);
+}
+function scoreSnapshot(matches) {
+  const snap = {};
+  for (const m of matches || []) {
+    if (hasScore(m)) snap[m.id] = { score: m.score, home: m.home, away: m.away, competition: m.competition };
+  }
+  return snap;
+}
+function detectLiveChanges(newMatches) {
+  const previous = state.lastSnapshot || {};
+  const next = scoreSnapshot(newMatches);
+  const changes = [];
+  for (const [id, row] of Object.entries(next)) {
+    if (previous[id] && previous[id].score !== row.score) changes.push(row);
+    if (!previous[id]) {
+      const m = newMatches.find(x => x.id === id);
+      if (m && m.status === 'í gangi') changes.push(row);
+    }
+  }
+  if (changes.length) {
+    changes.slice(0, 3).forEach(c => showToast('Staða breytt', `${c.home} ${c.score} ${c.away}`));
+  }
+  state.lastSnapshot = next;
+  localStorage.setItem('fotboltavaktin.scoreSnapshot', JSON.stringify(next));
+}
+function reportMarkup(report = {}, match = {}) {
+  const events = Array.isArray(report.events) ? report.events : [];
+  const assistants = Array.isArray(report.assistants) ? report.assistants : [];
+  const homeLineup = report.lineups?.home || [];
+  const awayLineup = report.lineups?.away || [];
+  const eventRows = events.length ? events.map(e => `<li><b>${escapeHtml(e.minute ? e.minute + '\'' : '')}</b> <span>${escapeHtml(e.type || 'atburður')}</span> ${escapeHtml(e.text || '')}</li>`).join('') : '<li>Engir atburðir fundust í opnum gögnum enn.</li>';
+  const lineupList = (items) => items.length ? `<ol>${items.slice(0, 18).map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ol>` : '<p class="muted">Byrjunarlið fannst ekki í opnum gögnum enn.</p>';
+  const badge = report.available ? '<span class="source-badge official">Leikskýrsla fannst</span>' : '<span class="source-badge fallback">Beðið eftir skýrslu</span>';
+  const link = report.sourceUrl ? `<a class="big-link" href="${escapeHtml(report.sourceUrl)}" target="_blank" rel="noopener noreferrer">Opna leikskýrslu / uppruna</a>` : '';
+  return `
+    <div class="report-card report-deluxe">
+      ${badge}
+      <h3>Leikskýrsla</h3>
+      <p>${escapeHtml(report.message || 'Leikskýrsla er ekki komin inn enn.')}</p>
+      <div class="report-grid">
+        <article><span>Dómari</span><strong>${escapeHtml(report.referee || 'Ekki birt enn')}</strong></article>
+        <article><span>Aðstoðardómarar</span><strong>${escapeHtml(assistants.join(', ') || 'Ekki birt enn')}</strong></article>
+        <article><span>Áhorfendur</span><strong>${escapeHtml(report.attendance || 'Ekki birt')}</strong></article>
+        <article><span>Atburðir</span><strong>${events.length}</strong></article>
+      </div>
+      <div class="two-col report-columns">
+        <section><h4>Atburðir</h4><ul class="event-list">${eventRows}</ul></section>
+        <section><h4>Staða gagna</h4><p class="muted">Vefurinn reynir að lesa dómara, mörk, spjöld, skiptingar og byrjunarlið úr opnum KSÍ/COMET gögnum. Ef skýrsla er ekki birt enn sýnist hér kurteis biðstaða.</p>${link}</section>
+      </div>
+      <div class="two-col report-columns">
+        <section><h4>${escapeHtml(match.home || 'Heimalið')} · byrjunarlið</h4>${lineupList(homeLineup)}</section>
+        <section><h4>${escapeHtml(match.away || 'Útilið')} · byrjunarlið</h4>${lineupList(awayLineup)}</section>
+      </div>
+    </div>`;
+}
+function setupDetailSwipe() {
+  const panels = ['overview', 'table', 'stats', 'report'];
+  let startX = 0;
+  let startY = 0;
+  els.detail.addEventListener('touchstart', e => {
+    startX = e.changedTouches[0].clientX;
+    startY = e.changedTouches[0].clientY;
+  }, { passive: true });
+  els.detail.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy)) return;
+    const active = els.detail.querySelector('[data-detail-tab].active')?.dataset.detailTab || 'overview';
+    const index = panels.indexOf(active);
+    const next = dx < 0 ? Math.min(panels.length - 1, index + 1) : Math.max(0, index - 1);
+    setDetailTab(panels[next]);
+  }, { passive: true });
+}
+
 async function loadMatches() {
   els.refresh.disabled = true;
   els.refresh.textContent = 'Sæki…';
@@ -402,7 +489,9 @@ async function loadMatches() {
     const res = await fetch('/.netlify/functions/matches', { cache: 'no-store' });
     if (!res.ok) throw new Error('Gagnaþjónn svaraði ekki rétt');
     const data = await res.json();
-    state.matches = Array.isArray(data.matches) ? data.matches : [];
+    const newMatches = Array.isArray(data.matches) ? data.matches : [];
+    detectLiveChanges(newMatches);
+    state.matches = newMatches;
     state.updatedAt = data.updatedAt || new Date().toISOString();
     state.errors = data.errors || [];
     state.competitions = buildCompetitionsFromMatches(state.matches);
@@ -448,11 +537,15 @@ els.leagues.addEventListener('change', e => {
   localStorage.setItem('fotboltavaktin.leagues', JSON.stringify(state.favoriteLeagues));
   render();
 });
+if (els.themeBtn) els.themeBtn.addEventListener('click', () => { state.theme = state.theme === 'light' ? 'dark' : 'light'; applyTheme(); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); state.installPrompt = e; if (els.installBtn) els.installBtn.classList.remove('hidden'); });
+if (els.installBtn) els.installBtn.addEventListener('click', async () => { if (!state.installPrompt) return; state.installPrompt.prompt(); await state.installPrompt.userChoice.catch(() => {}); state.installPrompt = null; els.installBtn.classList.add('hidden'); });
 els.closeDialog.addEventListener('click', () => els.dialog.close());
 els.dialog.addEventListener('click', e => { if (e.target === els.dialog) els.dialog.close(); });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
+applyTheme();
 loadMatches();
-setInterval(loadMatches, 120000);
+setInterval(loadMatches, 60000);

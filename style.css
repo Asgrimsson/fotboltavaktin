@@ -180,3 +180,64 @@ a:hover { text-decoration: underline; }
 .league-page-extra h3 { margin-top: 0; }
 .league-fav { color: #fde68a; }
 @media (max-width: 900px) { .search-row { grid-template-columns: 1fr; } .watch-grid, .league-summary { grid-template-columns: 1fr; } }
+
+/* v0.7 — Leikskýrsla + Live Pulse + Síma-app polish */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef7f0;
+  --panel: rgba(255,255,255,0.9);
+  --panel-2: rgba(236,253,245,0.9);
+  --text: #07111f;
+  --muted: #475569;
+  --line: rgba(15,23,42,0.14);
+  --shadow: 0 24px 80px rgba(15,23,42,0.16);
+}
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(34,197,94,0.24), transparent 32rem),
+    radial-gradient(circle at 90% 15%, rgba(59,130,246,0.16), transparent 28rem),
+    linear-gradient(160deg, #f8fafc 0%, #ecfdf5 55%, #eff6ff 100%);
+}
+:root[data-theme="light"] .match-card,
+:root[data-theme="light"] .competition-card,
+:root[data-theme="light"] .watch-card,
+:root[data-theme="light"] .controls,
+:root[data-theme="light"] .league-picker { background: rgba(255,255,255,.76); }
+:root[data-theme="light"] .detail-hero { background: linear-gradient(135deg, rgba(187,247,208,.88), rgba(255,255,255,.9)); }
+.hero-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.toast-stack { position: fixed; right: 16px; bottom: 16px; z-index: 9999; display: grid; gap: 10px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+.toast-item { transform: translateY(18px); opacity: 0; transition: .24s ease; border: 1px solid rgba(34,197,94,.35); background: rgba(7,17,31,.94); color: #f8fafc; border-radius: 18px; padding: 13px 14px; box-shadow: 0 18px 48px rgba(0,0,0,.32); display: grid; gap: 3px; }
+.toast-item.show { transform: translateY(0); opacity: 1; }
+.toast-item strong { color: var(--green-2); }
+.toast-item span { color: #dbeafe; font-size: .95rem; }
+.report-deluxe { display: grid; gap: 14px; }
+.report-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.report-grid article { border: 1px solid var(--line); border-radius: 16px; padding: 11px; background: rgba(2,6,23,.18); }
+.report-grid span { display: block; color: var(--muted); font-size: .83rem; font-weight: 850; }
+.report-grid strong { display: block; margin-top: 4px; font-size: 1.05rem; }
+.report-columns h4 { margin: 0 0 8px; }
+.event-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+.event-list li { border: 1px solid var(--line); border-radius: 14px; padding: 9px 10px; background: rgba(255,255,255,.05); }
+.event-list b { color: var(--green-2); margin-right: 6px; }
+.event-list span { color: #fde68a; font-weight: 900; margin-right: 6px; }
+.match-card:has(.status-pill.live) { border-color: rgba(251,113,133,.45); box-shadow: 0 18px 52px rgba(251,113,133,.1); }
+.detail-content { touch-action: pan-y; }
+@media (max-width: 760px) {
+  .hero-actions { width: 100%; justify-content: stretch; }
+  .hero-actions .ghost-btn { flex: 1 1 auto; }
+  .match-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border-left: 0; border-right: 0; }
+  .dialog-inner { min-height: 100dvh; padding: 14px; padding-top: max(14px, env(safe-area-inset-top)); }
+  .dialog-close { top: max(10px, env(safe-area-inset-top)); right: 10px; }
+  .detail-hero { padding-right: 56px; }
+  .detail-tabs { position: sticky; top: 0; z-index: 3; background: rgba(7,17,31,.92); padding: 8px 0; backdrop-filter: blur(14px); }
+  :root[data-theme="light"] .detail-tabs { background: rgba(248,250,252,.92); }
+  .report-grid { grid-template-columns: 1fr 1fr; }
+  .report-columns { grid-template-columns: 1fr; }
+  .cards { gap: 14px; }
+  .match-main { padding: 18px; }
+}
+@media (max-width: 480px) {
+  .report-grid { grid-template-columns: 1fr; }
+  .mini-stats { grid-template-columns: 1fr; }
+  .teams h2 { font-size: 1.45rem; }
+}

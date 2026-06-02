@@ -179,7 +179,7 @@ function parseKsi(html) {
       id: makeId('ksi', startIso || rawTime, home, away, competition),
       source: 'KSÍ',
       sourceUrl: meta.url || SOURCES.ksi,
-      matchReportUrl: '',
+      matchReportUrl: meta.url || '',
       dateLabel: currentDateLabel,
       rawTime,
       startTime: startIso,
@@ -507,8 +507,128 @@ async function getBestCompetitionTable(matches, matchOrMeta) {
   return fallback;
 }
 
+
+function fuzzyTeamKey(value) {
+  return normalizeKey(value)
+    .replace(/\b(karla|kvenna|ridill|ri\s*ill|deild|flokkur|lid|lið|a|b|c|d|e|f)\b/g, ' ')
+    .replace(/\b\d+\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findTeamRow(table, team) {
+  const wanted = fuzzyTeamKey(team);
+  const exact = table.rows.find(r => normalizeKey(r.team) === normalizeKey(team));
+  if (exact) return exact;
+  if (!wanted) return null;
+  return table.rows.find(r => {
+    const rowKey = fuzzyTeamKey(r.team);
+    return rowKey === wanted || rowKey.includes(wanted) || wanted.includes(rowKey);
+  }) || null;
+}
+
+function pickValueAfterLabel(lines, labels) {
+  const labelRe = new RegExp(`^(${labels.join('|')})\\s*:?\\s*(.*)$`, 'i');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(labelRe);
+    if (m) {
+      const value = clean(m[2]);
+      if (value && !labels.some(l => new RegExp(`^${l}$`, 'i').test(value))) return value;
+      const next = clean(lines[i + 1] || '');
+      if (next && next.length < 90) return next;
+    }
+  }
+  return '';
+}
+
+function parseReportEvents(lines, home, away) {
+  const events = [];
+  const interesting = /(mark|sjálfsmark|gult|rautt|spjald|skipting|víti|penalti|leikmaður|\d{1,3}\s*')/i;
+  for (const line of lines) {
+    const text = clean(line);
+    if (!text || text.length > 130) continue;
+    const minute = text.match(/(\d{1,3})\s*['´]/)?.[1] || '';
+    if (minute || interesting.test(text)) {
+      if (new RegExp(`${home}|${away}`, 'i').test(text) || /(mark|gult|rautt|spjald|skipting|víti|penalti)/i.test(text)) {
+        events.push({ minute, type: eventType(text), text });
+      }
+    }
+    if (events.length >= 24) break;
+  }
+  return events;
+}
+
+function eventType(text) {
+  if (/mark|sjálfsmark|víti|penalti/i.test(text)) return 'mark';
+  if (/rautt/i.test(text)) return 'rautt spjald';
+  if (/gult|spjald/i.test(text)) return 'spjald';
+  if (/skipting/i.test(text)) return 'skipting';
+  return 'atburður';
+}
+
+function parseLineupBlock(lines, label) {
+  const start = lines.findIndex(l => new RegExp(label, 'i').test(l));
+  if (start < 0) return [];
+  const out = [];
+  for (let i = start + 1; i < Math.min(lines.length, start + 35); i++) {
+    const line = clean(lines[i]);
+    if (!line || /^(varamenn|dómari|atburðir|mörk|leik lokið|staða|skiptingar)/i.test(line)) break;
+    if (line.length < 60 && !/^\d+$/.test(line)) out.push(line);
+    if (out.length >= 18) break;
+  }
+  return out;
+}
+
+function parseMatchReportHtml(html, match, url) {
+  const $ = cheerio.load(html);
+  const lines = $('body').text().split('\n').map(clean).filter(Boolean);
+  const fullText = lines.join('\n');
+  const referee = pickValueAfterLabel(lines, ['Dómari', 'Aðaldómari']);
+  const assistantsRaw = [pickValueAfterLabel(lines, ['Aðstoðardómari 1', 'Aðstoðardómari']), pickValueAfterLabel(lines, ['Aðstoðardómari 2']), pickValueAfterLabel(lines, ['Eftirlitsmaður'])].filter(Boolean);
+  const attendance = pickValueAfterLabel(lines, ['Áhorfendur', 'Ahorfendur']);
+  const events = parseReportEvents(lines, match.home, match.away);
+  const homeLineup = parseLineupBlock(lines, `${match.home}.*(byrjunar|leikmenn)|Byrjunarlið.*${match.home}`);
+  const awayLineup = parseLineupBlock(lines, `${match.away}.*(byrjunar|leikmenn)|Byrjunarlið.*${match.away}`);
+  const hasUseful = Boolean(referee || assistantsRaw.length || attendance || events.length || homeLineup.length || awayLineup.length || /leikskýrsla|dómari|atburðir|byrjunarlið/i.test(fullText));
+  return {
+    available: hasUseful,
+    sourceUrl: url,
+    message: hasUseful ? 'Leikskýrsla var lesin úr opnum gögnum eins vel og hægt var.' : 'Leikskýrsla er ekki birt eða ekki aðgengileg í opnu HTML-gögnunum enn. Opnaðu upprunaheimild til að sjá hvort KSÍ/COMET hafi birt meira.',
+    referee,
+    assistants: assistantsRaw,
+    attendance,
+    events,
+    lineups: { home: homeLineup, away: awayLineup },
+    rawHints: hasUseful ? [] : lines.filter(l => /dómari|leikskýrsla|skýrsla|atburðir|byrjunarlið/i.test(l)).slice(0, 8)
+  };
+}
+
+async function getMatchReport(match) {
+  const urls = Array.from(new Set([match.matchReportUrl, match.sourceUrl, match.competitionUrl].filter(Boolean)));
+  for (const url of urls) {
+    try {
+      const html = await fetchText(url);
+      const report = parseMatchReportHtml(html, match, url);
+      if (report.available) return report;
+      // Return the first honest attempt if nothing better is found later.
+      if (!urls[urls.length - 1]) return report;
+    } catch (_) {}
+  }
+  return {
+    available: false,
+    sourceUrl: match.sourceUrl || match.competitionUrl || '',
+    message: 'Leikskýrsla/dómarar fundust ekki í opnum gögnum fyrir þennan leik enn. Þetta getur breyst þegar KSÍ/COMET birtir leikskýrslu.',
+    referee: '',
+    assistants: [],
+    attendance: '',
+    events: [],
+    lineups: { home: [], away: [] },
+    rawHints: []
+  };
+}
+
 function teamStats(table, team) {
-  return table.rows.find(r => r.team.toLowerCase() === String(team || '').toLowerCase()) || emptyTeam(team || 'Óþekkt lið');
+  return findTeamRow(table, team) || emptyTeam(team || 'Óþekkt lið');
 }
 
 function smartFacts(match, table) {
@@ -575,5 +695,6 @@ module.exports = {
   getBestCompetitionTable,
   summarizeCompetitions,
   teamStats,
-  smartFacts
+  smartFacts,
+  getMatchReport
 };

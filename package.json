@@ -1,8 +1,8 @@
 {
   "name": "fotboltavaktin",
-  "version": "0.4.0",
+  "version": "0.7.0",
   "private": true,
-  "description": "Netlify-ready PWA með Mín vakt, smart yfirliti, Match Center og betri deildarsíðum.",
+  "description": "Netlify-ready PWA með leikskýrslu, live pulse, síma-app polish og betri Match Center.",
   "scripts": {
     "dev": "netlify dev",
     "build": "echo 'Static app - no build step'"
