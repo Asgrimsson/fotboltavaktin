@@ -1,3 +1,3 @@
-# Fótboltavaktin v1.9
+# Fótboltavaktin v2.0
 
-Live-greining löguð: les einnig KSÍ aðalspjöld þar sem tími birtist sem „19:30 2 jún.“.
+Sjálfvirk live-vakt sem sækir einnig liðasíður KSÍ þegar leikur er í gangi.

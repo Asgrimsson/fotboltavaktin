@@ -118,9 +118,11 @@ function statusFromStart(startIso, score) {
   if (!startIso) return 'á dagskrá';
   const now = Date.now();
   const start = new Date(startIso).getTime();
-  // Leikir geta tafist eða farið í uppbótartíma; gefum rúman 135 mín. glugga.
-  const end = start + 135 * 60 * 1000;
-  if (now >= start && now <= end) return 'í gangi';
+  // Live-vakt: byrja 10 mín fyrir leik og halda opið í 165 mínútur.
+  // KSÍ tekur stundum leiki úr 'Næstu leikir' þegar þeir hefjast, svo við þurfum rúman glugga.
+  const liveStart = start - 10 * 60 * 1000;
+  const end = start + 165 * 60 * 1000;
+  if (now >= liveStart && now <= end) return 'í gangi';
   if (now > end) return 'líklega lokið';
   return 'á eftir';
 }
@@ -132,7 +134,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/1.9 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/2.0 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -222,6 +224,66 @@ function parseTeamsFromWindow(lines, startIndex) {
     }
   }
   return { home: '', away: '', teamsLine: '' };
+}
+
+
+function collectTeamLinks($, competitionId = '') {
+  const links = new Map();
+  $('a[href*="/oll-mot/mot/lid"]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    if (!href) return;
+    const url = absoluteKsiUrl(href);
+    const id = String(competitionId || '').trim();
+    if (id && !url.includes(`competitionId=${id}`)) return;
+    const text = clean($(el).text()) || clean($(el).closest('tr, li, article, div').text()).slice(0, 80);
+    const key = url.replace(/&amp;/g, '&');
+    if (!links.has(key)) links.set(key, { url: key, name: text });
+  });
+  return Array.from(links.values());
+}
+
+async function fetchTeamPagesForLive(compHtmls, existingMatches, errors) {
+  const now = Date.now();
+  const maybeNeedLiveHelp = existingMatches.filter(m => isAllowedMatch(m) && statusFromStart(m.startTime, m.score) === 'í gangi').length === 0;
+  if (!maybeNeedLiveHelp) return [];
+
+  const teamLinks = [];
+  for (const item of compHtmls) {
+    try {
+      const $ = cheerio.load(item.html);
+      teamLinks.push(...collectTeamLinks($, item.comp.id));
+    } catch (_) {}
+  }
+
+  const seen = new Set();
+  const unique = teamLinks.filter(link => {
+    if (!link.url || seen.has(link.url)) return false;
+    seen.add(link.url);
+    return true;
+  }).slice(0, 80);
+
+  const found = [];
+  // Sækjum liðasíður í litlum skömmtum svo Netlify-function hamri ekki á KSÍ.
+  for (let i = 0; i < unique.length; i += 6) {
+    const batch = unique.slice(i, i + 6);
+    const results = await Promise.allSettled(batch.map(async link => {
+      const html = await fetchText(link.url);
+      return parseKsi(html, {});
+    }));
+    for (const res of results) {
+      if (res.status === 'fulfilled') {
+        for (const m of res.value) {
+          if (!m.startTime) continue;
+          const start = new Date(m.startTime).getTime();
+          // Tökum bara leiki sem eru nálægt núinu eða mjög næstu daga.
+          if (start >= now - 3 * 60 * 60 * 1000 && start <= now + 10 * 24 * 60 * 60 * 1000) found.push(m);
+        }
+      } else {
+        errors.push(`Liðasíða: ${res.reason?.message || res.reason}`);
+      }
+    }
+  }
+  return found;
 }
 
 function collectMatchReportLinks($) {
@@ -478,6 +540,7 @@ function sortMatches(matches) {
 async function getAllMatches() {
   const errors = [];
   let matches = [];
+  const compHtmls = [];
 
   try {
     matches = matches.concat(parseKsi(await fetchText(SOURCES.ksi)));
@@ -487,10 +550,20 @@ async function getAllMatches() {
 
   for (const comp of FEATURED_COMPETITIONS) {
     try {
-      matches = matches.concat(parseKsi(await fetchText(comp.url), comp));
+      const html = await fetchText(comp.url);
+      compHtmls.push({ comp, html });
+      matches = matches.concat(parseKsi(html, comp));
     } catch (err) {
       errors.push(`${comp.name}: ${err.message}`);
     }
+  }
+
+  // v2.0: Þegar leikur byrjar getur hann horfið úr 'Næstu leikir' á mótasíðu KSÍ.
+  // Þá sækjum við líka liðasíður fyrir viðkomandi mót og finnum leiki sem eru nálægt núinu.
+  try {
+    matches = matches.concat(await fetchTeamPagesForLive(compHtmls, matches, errors));
+  } catch (err) {
+    errors.push(`Live-liðasíður: ${err.message}`);
   }
 
   // KSÍ er eina gagnaveitan fyrir leiki og leikskýrslur.
