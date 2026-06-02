@@ -15,13 +15,13 @@
         <div class="brand">
           <div class="ball" aria-hidden="true">⚽</div>
           <div>
-            <p class="eyebrow">Íslenski boltinn · v0.3.1</p>
+            <p class="eyebrow">Íslenski boltinn · v0.4</p>
             <h1>Fótboltavaktin</h1>
           </div>
         </div>
         <button id="refreshBtn" class="ghost-btn" type="button">Uppfæra</button>
       </div>
-      <p class="lead">Leikir, Match Center, opinberar KSÍ töflur og deildaryfirlit í farsímavænu PWA appi.</p>
+      <p class="lead">Persónuleg fótboltavakt með Mín vakt, smart yfirliti, Match Center og betri deildarsíðum.</p>
       <div class="status-strip" id="statusStrip"><span>Hleð gögn…</span></div>
     </header>
 
@@ -34,6 +34,7 @@
           <button class="tab" data-filter="results">Úrslit</button>
           <button class="tab" data-filter="all">Allt</button>
           <button class="tab" data-filter="mine">Mín lið</button>
+          <button class="tab" data-filter="watch">Mín vakt</button>
         </div>
         <div class="search-row">
           <label class="search-label">
@@ -43,6 +44,10 @@
           <label class="search-label compact">
             <span>Mín lið</span>
             <input id="teamsInput" type="text" placeholder="Selfoss, Víkingur…" />
+          </label>
+          <label class="search-label compact">
+            <span>Mínar deildir</span>
+            <input id="leaguesInput" type="text" placeholder="5. deild, Besta deild…" />
           </label>
         </div>
       </section>
@@ -54,6 +59,7 @@
         <article class="metric"><strong id="metricTotal">0</strong><span>leikir sóttir</span></article>
       </section>
 
+      <section class="watch-dashboard" id="watchDashboard" aria-live="polite"></section>
       <section class="league-picker" id="leagueStrip" aria-label="Veldu deild"></section>
       <section class="competition-overview" id="competitionOverview" aria-live="polite"></section>
       <section class="cards" id="cards" aria-live="polite"></section>

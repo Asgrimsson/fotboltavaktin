@@ -1,8 +1,8 @@
 {
   "name": "fotboltavaktin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Netlify-ready PWA með leikjalista, Match Center, opinberum KSÍ stöðutöflum, Match Center og deildaryfirliti.",
+  "description": "Netlify-ready PWA með Mín vakt, smart yfirliti, Match Center og betri deildarsíðum.",
   "scripts": {
     "dev": "netlify dev",
     "build": "echo 'Static app - no build step'"
