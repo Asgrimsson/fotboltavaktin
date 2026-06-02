@@ -34,6 +34,28 @@ const MONTHS = {
 const DAY_RE = /^((?:Mán|Man|Þri|Thri|Mið|Mid|Fim|Fös|Fos|Lau|Sun|mánudagur|manudagur|þriðjudagur|thridjudagur|miðvikudagur|midvikudagur|fimmtudagur|föstudagur|fostudagur|laugardagur|sunnudagur))\s+(\d{1,2})\.\s+([A-Za-zÁÉÍÓÚÝÞÆÖÐáéíóúýþæöð]+)\s+(\d{1,2}:\d{2})/i;
 const DATE_ONLY_RE = /^(\d{1,2})\.\s+([A-Za-zÁÉÍÓÚÝÞÆÖÐáéíóúýþæöð]+)$/i;
 const DATE_LINE_RE = /^(mánudagur|þriðjudagur|miðvikudagur|fimmtudagur|föstudagur|laugardagur|sunnudagur)\s+\d{1,2}\.\s+[a-záéíóúýþæöð]+/i;
+const TIME_DATE_RE = /^(\d{1,2}:\d{2})\s+(\d{1,2})\s+([A-Za-zÁÉÍÓÚÝÞÆÖÐáéíóúýþæöð]+)\.?$/i;
+
+function previousUseful(lines, fromIndex, maxBack = 8) {
+  for (let j = fromIndex; j >= Math.max(0, fromIndex - maxBack); j--) {
+    const line = clean(lines[j]);
+    if (!isUsefulToken(line)) continue;
+    if (/^Sjá /i.test(line) || /^Veldu/i.test(line)) continue;
+    return { line, index: j };
+  }
+  return { line: '', index: -1 };
+}
+
+function nextUseful(lines, fromIndex, maxForward = 8) {
+  for (let j = fromIndex; j <= Math.min(lines.length - 1, fromIndex + maxForward); j++) {
+    const line = clean(lines[j]);
+    if (!isUsefulToken(line)) continue;
+    if (/^Sjá /i.test(line) || /^Veldu/i.test(line)) continue;
+    return { line, index: j };
+  }
+  return { line: '', index: -1 };
+}
+
 
 function clean(text) {
   return String(text || '')
@@ -110,7 +132,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/1.6 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/1.9 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -241,6 +263,49 @@ function parseKsi(html, options = {}) {
     const line = lines[i];
     const dateOnly = line.match(DATE_ONLY_RE);
     if (dateOnly) currentDateLabel = line;
+
+    const quickTime = line.match(TIME_DATE_RE);
+    if (quickTime && !DAY_RE.test(line)) {
+      const homeHit = previousUseful(lines, i - 1, 8);
+      const awayHit = nextUseful(lines, i + 1, 8);
+      const compHit = previousUseful(lines, homeHit.index - 1, 8);
+      const venueHit = previousUseful(lines, compHit.index - 1, 8);
+      const dateHit = previousUseful(lines, venueHit.index - 1, 8);
+      const home = normalizeName(homeHit.line);
+      const away = normalizeName(awayHit.line);
+      const competition = clean(compHit.line || options.name || '');
+      const venue = clean(venueHit.line || '');
+      const start = parseIcelandicDate(quickTime[2], quickTime[3], quickTime[1]);
+      const startIso = start ? start.toISOString() : null;
+      const rawTime = clean(`${dateHit.line || currentDateLabel} ${quickTime[1]}`);
+      if (home && away && competition && !/^(Sjá|Veldu|Næstu|Nýjustu)/i.test(home + away + competition)) {
+        const meta = getCompetitionMeta(competitionLinks, competition);
+        const officialMeta = options.id && normalizeKey(options.name || '') === normalizeKey(competition) ? options : null;
+        const reportUrl = findMatchReportUrl(reportLinks, home, away, quickTime[1]);
+        const compUrl = officialMeta?.url || meta.url || options.url || '';
+        const compId = officialMeta?.id || meta.id || options.id || '';
+        matches.push({
+          id: makeId('ksi', startIso || rawTime, home, away, competition),
+          source: 'KSÍ',
+          sourceUrl: reportUrl || compUrl || SOURCES.ksi,
+          matchReportUrl: reportUrl || '',
+          dateLabel: dateHit.line || currentDateLabel,
+          rawTime,
+          startTime: startIso,
+          localTime: quickTime[1],
+          venue,
+          competition,
+          competitionKey: slug(competition),
+          competitionId: compId || '',
+          competitionUrl: compUrl || '',
+          home,
+          away,
+          score: '',
+          status: statusFromStart(startIso, '')
+        });
+      }
+      continue;
+    }
 
     const tm = line.match(DAY_RE);
     if (!tm) continue;
