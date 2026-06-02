@@ -6,19 +6,8 @@ const SOURCES = {
   urslit: 'https://www.urslit.net/'
 };
 
-// v2.1: Prófum fleiri mögulegar Úrslit.net slóðir. Síðan er app-lík og getur breyst,
-// þannig að þetta er kurteis fallback: ef gögn finnast ekki höldum við KSÍ-gögnum óbreyttum.
-const URSLIT_LIVE_URLS = [
-  'https://www.urslit.net/',
-  'https://www.urslit.net/leikir',
-  'https://www.urslit.net/leikir?tab=i-gangi',
-  'https://www.urslit.net/leikir?filter=i-gangi',
-  'https://www.urslit.net/leikir?status=live',
-  'https://www.urslit.net/?tab=i-gangi'
-];
-
-// v1.5: Sækjum neðri fullorðinsdeildir beint af mótasíðum KSÍ.
-// Þetta lagar að grunnsíðan /felagslid/ skili stundum aðeins örfáum leikjum.
+// v2.2: Live Rescue. Sækjum neðri deildir beint af mótasíðum KSÍ
+// + úrslitasíðum + liðasíðum svo byrjaðir leikir týnist ekki.
 const FEATURED_COMPETITIONS = [
   { name: '2. deild karla', id: '7025548', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025548' },
   { name: '3. deild karla', id: '7025551', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025551' },
@@ -26,6 +15,52 @@ const FEATURED_COMPETITIONS = [
   { name: '5. deild karla A riðill', id: '7025573', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025573' },
   { name: '5. deild karla B riðill', id: '7025587', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025587' }
 ];
+
+function addParam(url, key, value) {
+  const sep = url.includes('?') ? '&' : '?';
+  if (new RegExp(`[?&]${key}=`).test(url)) return url;
+  return `${url}${sep}${key}=${encodeURIComponent(value)}`;
+}
+
+function withResults(url) {
+  return addParam(url, 'toggle', 'results');
+}
+
+function withPage(url, page) {
+  return addParam(url, 'page', String(page));
+}
+
+function competitionFetchUrls(comp) {
+  const urls = new Set();
+  urls.add(comp.url);
+  urls.add(withResults(comp.url));
+  // KSÍ paginar úrslit/leiki. Byrjaðir leikir detta stundum á result-pages.
+  for (let page = 1; page <= 5; page++) urls.add(withPage(withResults(comp.url), page));
+  return Array.from(urls);
+}
+
+// Neyðarlisti yfir liðasíður í mótum sem notandinn fylgist oft með.
+// Þessi listi er ekki notaður sem handvirk síun í UI; hann er bara live-rescue gagnaleið.
+const LIVE_RESCUE_TEAM_URLS = [
+  // 5. deild karla B riðill 2026
+  'https://www.ksi.is/oll-mot/mot/lid?banner-tab=matches&competitionId=7025587&id=6907', // BF 108
+  'https://www.ksi.is/oll-mot/mot/lid?banner-tab=matches&competitionId=7025587&id=6210', // Stokkseyri
+  'https://www.ksi.is/oll-mot/mot/lid?banner-tab=matches&competitionId=7025587&id=6167', // KB
+  'https://www.ksi.is/oll-mot/mot/lid?banner-tab=matches&competitionId=7025587&id=6339', // RB
+  'https://www.ksi.is/oll-mot/mot/lid?banner-tab=matches&competitionId=7025587&id=5739', // KM
+  'https://www.ksi.is/oll-mot/mot/lid?banner-tab=matches&competitionId=7025587&id=5170'  // Kría
+];
+
+function expandedTeamUrls(urls) {
+  const out = new Set();
+  for (const u of urls) {
+    if (!u) continue;
+    out.add(u);
+    out.add(withResults(u));
+  }
+  return Array.from(out);
+}
+
 
 const MONTHS = {
   'janúar': 0, 'januar': 0, 'jan': 0,
@@ -125,15 +160,15 @@ function parseScore(score) {
 }
 
 function statusFromStart(startIso, score) {
-  if (parseScore(score)) return 'lokið';
-  if (!startIso) return 'á dagskrá';
+  if (!startIso) return parseScore(score) ? 'lokið' : 'á dagskrá';
   const now = Date.now();
   const start = new Date(startIso).getTime();
-  // Live-vakt: byrja 10 mín fyrir leik og halda opið í 165 mínútur.
-  // KSÍ tekur stundum leiki úr 'Næstu leikir' þegar þeir hefjast, svo við þurfum rúman glugga.
-  const liveStart = start - 10 * 60 * 1000;
-  const end = start + 165 * 60 * 1000;
+  // Live Rescue: byrja 15 mín fyrir leik og halda opið í 180 mínútur.
+  // Ef KSÍ sýnir bráðabirgðastöðu á meðan leikur er í gangi má það EKKI gera leikinn sjálfkrafa 'lokið'.
+  const liveStart = start - 15 * 60 * 1000;
+  const end = start + 180 * 60 * 1000;
   if (now >= liveStart && now <= end) return 'í gangi';
+  if (parseScore(score)) return 'lokið';
   if (now > end) return 'líklega lokið';
   return 'á eftir';
 }
@@ -145,7 +180,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/2.1 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/2.2 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -267,11 +302,16 @@ async function fetchTeamPagesForLive(compHtmls, existingMatches, errors) {
   }
 
   const seen = new Set();
-  const unique = teamLinks.filter(link => {
-    if (!link.url || seen.has(link.url)) return false;
-    seen.add(link.url);
+  const teamCandidates = [
+    ...teamLinks.map(x => x.url),
+    ...LIVE_RESCUE_TEAM_URLS
+  ];
+  const uniqueUrls = expandedTeamUrls(teamCandidates).filter(url => {
+    if (!url || seen.has(url)) return false;
+    seen.add(url);
     return true;
-  }).slice(0, 80);
+  }).slice(0, 140);
+  const unique = uniqueUrls.map(url => ({ url, name: 'Live rescue' }));
 
   const found = [];
   // Sækjum liðasíður í litlum skömmtum svo Netlify-function hamri ekki á KSÍ.
@@ -529,200 +569,6 @@ function parseFotbolti(html) {
   return matches.slice(0, 120);
 }
 
-
-function deepFindUrslitMatches(value, out = [], seen = new Set()) {
-  if (!value || typeof value !== 'object') return out;
-  if (seen.has(value)) return out;
-  seen.add(value);
-  if (Array.isArray(value)) {
-    for (const item of value) deepFindUrslitMatches(item, out, seen);
-    return out;
-  }
-
-  const keys = Object.keys(value);
-  const pick = (...names) => {
-    for (const name of names) {
-      if (value[name] !== undefined && value[name] !== null) return clean(value[name]);
-    }
-    return '';
-  };
-  const home = pick('homeTeam', 'home_team', 'homeName', 'home', 'team1', 'teamA', 'home_team_name', 'heimalið', 'heimilid');
-  const away = pick('awayTeam', 'away_team', 'awayName', 'away', 'team2', 'teamB', 'away_team_name', 'útilið', 'utilid');
-  const comp = pick('competition', 'competitionName', 'league', 'leagueName', 'tournament', 'deild', 'mót', 'mot');
-  const venue = pick('venue', 'stadium', 'völlur', 'vollur');
-  const statusRaw = pick('status', 'state', 'matchStatus', 'period', 'phase');
-  const minuteRaw = pick('minute', 'matchMinute', 'time', 'clock');
-  let score = pick('score', 'result', 'fullTimeScore');
-  const hg = pick('homeGoals', 'home_score', 'homeScore', 'goalsHome');
-  const ag = pick('awayGoals', 'away_score', 'awayScore', 'goalsAway');
-  if (!score && /^\d+$/.test(hg) && /^\d+$/.test(ag)) score = `${hg} - ${ag}`;
-  const startRaw = pick('startTime', 'start_time', 'dateTime', 'kickoff', 'matchTime', 'startsAt', 'date');
-
-  const statusText = normalizeKey(`${statusRaw} ${minuteRaw}`);
-  const liveish = /live|gangi|halfleik|hálfleik|leikur hafinn|1 half|2 half|fyrri|seinni/.test(statusText) || (/^\d{1,3}$/.test(minuteRaw) && Number(minuteRaw) > 0 && Number(minuteRaw) < 130);
-
-  if (home && away && (liveish || parseScore(score) || startRaw) && home.length < 80 && away.length < 80) {
-    let startIso = null;
-    const parsed = Date.parse(startRaw);
-    if (Number.isFinite(parsed)) startIso = new Date(parsed).toISOString();
-    const localTime = String(startRaw).match(/\b\d{1,2}:\d{2}\b/)?.[0] || (String(minuteRaw).match(/^\d{1,3}$/) ? `${minuteRaw}. mín` : '');
-    out.push({
-      id: makeId('urslit-live', startIso || localTime || statusRaw, home, away, comp || 'Úrslit.net live', score),
-      source: 'Úrslit.net',
-      sourceUrl: SOURCES.urslit,
-      matchReportUrl: '',
-      dateLabel: 'Í gangi',
-      rawTime: localTime || statusRaw || 'live',
-      startTime: startIso,
-      localTime,
-      venue,
-      competition: comp || 'Úrslit.net live',
-      competitionKey: slug(comp || 'Úrslit.net live'),
-      competitionId: '',
-      competitionUrl: '',
-      home: normalizeName(home),
-      away: normalizeName(away),
-      score: score || '',
-      status: liveish ? 'í gangi' : statusFromStart(startIso, score)
-    });
-  }
-
-  // Limit recursion noise slightly, but still inspect nested data/app state.
-  for (const k of keys) {
-    if (typeof value[k] === 'object') deepFindUrslitMatches(value[k], out, seen);
-  }
-  return out;
-}
-
-function parseUrslitText(html) {
-  const $ = cheerio.load(html);
-  const lines = $('body').text().split('\n').map(clean).filter(Boolean);
-  const matches = [];
-  let competition = 'Úrslit.net live';
-  const liveWords = /(í gangi|live|hálfleik|halfleik|leikur hafinn|fyrri hálfleikur|seinni hálfleikur)/i;
-  const compWords = /(\b[2-5]\.\s*deild\s+karla\b|bikar|úrvalsdeild|lengjudeild|deild|riðill)/i;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (compWords.test(line) && line.length < 90 && !/\d+\s*[-:]\s*\d+/.test(line)) {
-      competition = line;
-      continue;
-    }
-
-    const context = clean(lines.slice(Math.max(0, i - 3), Math.min(lines.length, i + 5)).join(' '));
-    const isLiveContext = liveWords.test(context) || /\b\d{1,3}\s*['´]/.test(context);
-
-    // Dæmi: "Heimalið 1 - 0 Útilið" eða "Heimalið 1:0 Útilið"
-    let m = line.match(/^(.{2,60}?)\s+(\d{1,2})\s*[-:]\s*(\d{1,2})\s+(.{2,60}?)$/);
-    if (m && isLiveContext) {
-      const home = normalizeName(m[1]);
-      const away = normalizeName(m[4]);
-      if (home && away && !/^(í dag|í gangi|leikir|deildir)$/i.test(home + away)) {
-        matches.push({
-          id: makeId('urslit-live-text', context, home, away, competition, `${m[2]} - ${m[3]}`),
-          source: 'Úrslit.net',
-          sourceUrl: SOURCES.urslit,
-          matchReportUrl: '',
-          dateLabel: 'Í gangi',
-          rawTime: context.match(/\d{1,3}\s*['´]/)?.[0] || 'live',
-          startTime: null,
-          localTime: context.match(/\d{1,3}\s*['´]/)?.[0] || '',
-          venue: '',
-          competition,
-          competitionKey: slug(competition),
-          competitionId: '',
-          competitionUrl: '',
-          home,
-          away,
-          score: `${m[2]} - ${m[3]}`,
-          status: 'í gangi'
-        });
-      }
-      continue;
-    }
-
-    // Dæmi: "Heimalið - Útilið" nálægt live-status, án stöðu.
-    m = line.match(/^(.{2,60}?)\s+[–-]\s+(.{2,60}?)$/);
-    if (m && isLiveContext && !/^(Leikir|Deildir|Flýtival|Hafa samband)$/i.test(line)) {
-      const home = normalizeName(m[1]);
-      const away = normalizeName(m[2]);
-      if (home && away && home.length < 60 && away.length < 60) {
-        matches.push({
-          id: makeId('urslit-live-text', context, home, away, competition),
-          source: 'Úrslit.net',
-          sourceUrl: SOURCES.urslit,
-          matchReportUrl: '',
-          dateLabel: 'Í gangi',
-          rawTime: context.match(/\d{1,3}\s*['´]/)?.[0] || 'live',
-          startTime: null,
-          localTime: context.match(/\d{1,3}\s*['´]/)?.[0] || '',
-          venue: '',
-          competition,
-          competitionKey: slug(competition),
-          competitionId: '',
-          competitionUrl: '',
-          home,
-          away,
-          score: '',
-          status: 'í gangi'
-        });
-      }
-    }
-  }
-  return matches;
-}
-
-function parseUrslitJsonFromHtml(html) {
-  const $ = cheerio.load(html);
-  const matches = [];
-  $('script').each((_, el) => {
-    const raw = clean($(el).html() || '');
-    if (!raw || raw.length < 20) return;
-    const candidates = [];
-    if (/^\s*[\[{]/.test(raw)) candidates.push(raw);
-    const nextData = raw.match(/self\.__next_f\.push\((.*)\)/s)?.[1];
-    if (nextData) candidates.push(nextData);
-    const jsonBlocks = raw.match(/\{[\s\S]{20,}\}/g) || [];
-    candidates.push(...jsonBlocks.slice(0, 4));
-    for (const c of candidates) {
-      try {
-        const parsed = JSON.parse(c);
-        deepFindUrslitMatches(parsed, matches);
-      } catch (_) {}
-    }
-  });
-  return matches;
-}
-
-async function getUrslitLiveMatches(errors = []) {
-  const found = [];
-  const tried = new Set();
-  for (const url of URSLIT_LIVE_URLS) {
-    if (tried.has(url)) continue;
-    tried.add(url);
-    try {
-      const html = await fetchText(url);
-      found.push(...parseUrslitJsonFromHtml(html));
-      found.push(...parseUrslitText(html));
-    } catch (err) {
-      errors.push(`Úrslit.net live (${url}): ${err.message}`);
-    }
-    // Ef við fundum live leiki stoppum við til að spara beiðnir.
-    if (found.some(m => m.status === 'í gangi')) break;
-  }
-  return uniqueMatches(found).slice(0, 80);
-}
-
-function isAllowedUrslitLive(match) {
-  if (!match || match.source !== 'Úrslit.net') return false;
-  if (match.status !== 'í gangi') return false;
-  const compKey = normalizeKey(match.competition || '');
-  // Ef Úrslit.net gefur deildarheiti notum við áfram neðri deildir karla.
-  if (compKey && compKey !== 'urslit net live') return isLowerLeagueName(match.competition);
-  // Ef deildarheiti vantar en leikurinn er live leyfum við hann svo Live Center verði gagnlegt.
-  return true;
-}
-
 function uniqueMatches(matches) {
   const seen = new Set();
   return matches.filter(m => {
@@ -754,12 +600,14 @@ async function getAllMatches() {
   }
 
   for (const comp of FEATURED_COMPETITIONS) {
-    try {
-      const html = await fetchText(comp.url);
-      compHtmls.push({ comp, html });
-      matches = matches.concat(parseKsi(html, comp));
-    } catch (err) {
-      errors.push(`${comp.name}: ${err.message}`);
+    for (const url of competitionFetchUrls(comp)) {
+      try {
+        const html = await fetchText(url);
+        compHtmls.push({ comp, html, url });
+        matches = matches.concat(parseKsi(html, { ...comp, url }));
+      } catch (err) {
+        errors.push(`${comp.name}: ${err.message}`);
+      }
     }
   }
 
@@ -771,16 +619,15 @@ async function getAllMatches() {
     errors.push(`Live-liðasíður: ${err.message}`);
   }
 
-  // v2.1: Úrslit.net notað sem live-brú. Það er EKKI notað í leikskýrslur,
-  // heldur aðeins til að finna leiki sem eru í gangi þegar KSÍ-listar skila þeim ekki sem live.
+  // KSÍ er eina gagnaveitan fyrir leiki og leikskýrslur.
+  // Fótbolti.net er ekki notað þar sem fréttalínur gátu ranglega birst sem atburðir.
   try {
-    const urslitLive = await getUrslitLiveMatches(errors);
-    matches = matches.concat(urslitLive.filter(isAllowedUrslitLive));
+    await fetchText(SOURCES.urslit);
   } catch (err) {
-    errors.push(`Úrslit.net live bridge: ${err.message}`);
+    errors.push(`Úrslit.net: ${err.message}`);
   }
 
-  return { matches: sortMatches(uniqueMatches(matches.filter(m => isAllowedMatch(m) || isAllowedUrslitLive(m)))), errors };
+  return { matches: sortMatches(uniqueMatches(matches.filter(isAllowedMatch))), errors };
 }
 
 function emptyTeam(team) {
@@ -1166,6 +1013,5 @@ module.exports = {
   summarizeCompetitions,
   teamStats,
   smartFacts,
-  getMatchReport,
-  getUrslitLiveMatches
+  getMatchReport
 };
