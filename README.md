@@ -1,3 +1,3 @@
-# Fótboltavaktin v2.0
+# Fótboltavaktin v2.1
 
-Sjálfvirk live-vakt sem sækir einnig liðasíður KSÍ þegar leikur er í gangi.
+KSÍ + Úrslit.net live bridge. Netlify-ready PWA.
