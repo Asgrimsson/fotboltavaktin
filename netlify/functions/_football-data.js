@@ -110,7 +110,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/1.5 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/1.6 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -169,7 +169,10 @@ function isLowerLeagueName(name) {
   const text = normalizeKey(name || '');
   if (/besta\s+deild|lengjudeild/.test(text)) return false;
   if (isYouthCompetitionName(text)) return false;
-  return /(?:^|\s)(2|3|4|5)\.??\s*deild/.test(text);
+  // v1.6: Notandinn vill fókus á neðri deildir karla.
+  // Tekur því út 2. deild kvenna og aðrar kvennadeildir.
+  if (/kvenna/.test(text)) return false;
+  return /(?:^|\s)(2|3|4|5)\.??\s*deild\s+karla/.test(text);
 }
 
 function isAllowedMatch(match) {

@@ -351,3 +351,11 @@ html[data-theme="light"] .featured-card {
 }
 .list-note strong{color:var(--text)}
 @media (max-width:720px){.list-note{display:block}.list-note span{display:block;margin-top:4px}}
+
+.live-center { margin-top: 18px; }
+.live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.live-card { text-align: left; border: 1px solid rgba(134,239,172,.35); background: linear-gradient(135deg, rgba(20,83,45,.78), rgba(15,23,42,.9)); color: var(--text); border-radius: 20px; padding: 16px; cursor: pointer; box-shadow: 0 16px 32px rgba(0,0,0,.18); }
+.live-card strong { display:block; font-size: 1.18rem; margin: 8px 0 6px; }
+.live-card small { color: var(--muted); line-height: 1.35; }
+.live-dot { color: #86efac; font-weight: 900; letter-spacing: .02em; animation: pulseLive 1.3s infinite; }
+@keyframes pulseLive { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }

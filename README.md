@@ -1,3 +1,3 @@
-# Fótboltavaktin v1.5
+# Fótboltavaktin v1.6
 
-Lagar gagnasöfnun: sækir neðri deildir karla beint af KSÍ mótasíðum og heldur aðallista í topp 10.
+KSÍ-only, neðri deildir karla, Live Center og hreinni síun.
