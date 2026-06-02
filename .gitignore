@@ -1,0 +1,4 @@
+node_modules/ 
+.netlify/ 
+npm-debug.log* 
+.env 

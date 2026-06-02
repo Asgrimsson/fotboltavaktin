@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="is">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#22c55e" />
+  <title>Fótboltavaktin</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero-top">
+        <div class="brand">
+          <div class="ball">⚽</div>
+          <div>
+            <p class="eyebrow">Íslenski boltinn</p>
+            <h1>Fótboltavaktin</h1>
+          </div>
+        </div>
+        <button id="refreshBtn" class="ghost-btn" type="button">Uppfæra</button>
+      </div>
+      <p class="lead">Leikir í dag, leikir í gangi og næstu leikir úr íslenskum fótbolta.</p>
+      <div class="status-strip" id="statusStrip">
+        <span>Hleð gögn…</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="controls" aria-label="Síur">
+        <div class="tabs" role="tablist" aria-label="Veldu sýn">
+          <button class="tab active" data-filter="now">Í gangi</button>
+          <button class="tab" data-filter="today">Í dag</button>
+          <button class="tab" data-filter="upcoming">Næst</button>
+          <button class="tab" data-filter="all">Allt</button>
+          <button class="tab" data-filter="mine">Mín lið</button>
+        </div>
+        <div class="search-row">
+          <label class="search-label">
+            <span>Leita</span>
+            <input id="searchInput" type="search" placeholder="Lið, völlur eða deild…" autocomplete="off" />
+          </label>
+          <label class="search-label compact">
+            <span>Mín lið</span>
+            <input id="teamsInput" type="text" placeholder="Selfoss, Víkingur…" />
+          </label>
+        </div>
+      </section>
+
+      <section class="summary-grid" id="summaryGrid" aria-live="polite">
+        <article class="metric"><strong id="metricNow">0</strong><span>í gangi</span></article>
+        <article class="metric"><strong id="metricToday">0</strong><span>í dag</span></article>
+        <article class="metric"><strong id="metricTotal">0</strong><span>leikir sóttir</span></article>
+      </section>
+
+      <section class="cards" id="cards" aria-live="polite"></section>
+      <section class="empty hidden" id="emptyState">
+        <div>🔎</div>
+        <h2>Engir leikir fundust í þessari síu</h2>
+        <p>Prófaðu að velja „Allt“, hreinsa leitina eða bæta við fleiri liðum í „Mín lið“.</p>
+      </section>
+    </main>
+  </div>
+
+  <template id="matchTemplate">
+    <article class="match-card">
+      <div class="match-main">
+        <div class="time-block">
+          <span class="status-pill"></span>
+          <strong class="time"></strong>
+          <small class="date"></small>
+        </div>
+        <div class="teams">
+          <h2><span class="home"></span><span class="dash">–</span><span class="away"></span></h2>
+          <p class="meta"></p>
+        </div>
+      </div>
+      <div class="match-footer">
+        <span class="source"></span>
+        <a class="source-link" target="_blank" rel="noopener noreferrer">Opna heimild</a>
+      </div>
+    </article>
+  </template>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

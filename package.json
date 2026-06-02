@@ -1,0 +1,16 @@
+{
+  "name": "fotboltavaktin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Netlify-ready PWA sem sýnir íslenska fótboltaleiki frá opinberum vefgögnum.",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Static app - no build step'"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.38.1"
+  }
+}
