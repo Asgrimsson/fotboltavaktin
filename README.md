@@ -1,25 +1,28 @@
-# Fótboltavaktin v1.0
+# Fótboltavaktin v1.1
 
-Netlify-ready PWA fyrir íslenska fótboltaleiki.
+Netlify-ready PWA fyrir íslenska fótboltann.
 
-## Nýtt í v1.0
+## Nýtt í v1.1
 
-- Leikskýrsla + dómarar: reynir að lesa dómara, aðstoðardómara, atburði, mörk/spjöld og byrjunarlið úr opnum KSÍ/COMET gögnum þegar þau eru birt.
-- Live Pulse: sjálfvirk uppfærsla á 60 sekúndna fresti, staða merkt og toast-tilkynningar ef skor breytist.
-- Síma-app polish: betri farsímagluggi, swipe milli Match Center flipa, stærri spjöld, ljós/dökk stilling og PWA heimaskjáshnappur.
-- Mín vakt, deildarsíður, KSÍ töflur og liðatölfræði halda sér úr fyrri útgáfum.
+- Úrvalsdeildir/Lengjudeildir alltaf sýnilegar:
+  - Besta deild karla
+  - Besta deild kvenna
+  - Lengjudeild karla
+  - Lengjudeild kvenna
+- Leikdagur-yfirlit með hnöppum sem hoppa beint í rétta síu.
+- Betri virkni á síuhnöppum: Í gangi, Í dag, Næst, Úrslit, Allt, Mín lið, Mín vakt.
+- Betri KSÍ-lesari sem nær betur leikjum þar sem lið eru brotin upp í HTML, t.d. BF 108 – Stokkseyri.
+- Bætt Fótbolti.net fallback fyrir leikjalínur eins og `19:30 | BF 108-Stokkseyri`.
 
-## Keyrsla local
+## Keyrsla
 
 ```bash
 npm install
 npx netlify dev
 ```
 
-Opnaðu síðan `http://localhost:8888`.
+Opna:
 
-## Deploy á Netlify
-
-Build command: `npm run build`  
-Publish directory: `.`  
-Functions directory: `netlify/functions`
+```text
+http://localhost:8888
+```

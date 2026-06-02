@@ -7,6 +7,13 @@ const SOURCES = {
   urslit: 'https://www.urslit.net/'
 };
 
+const FEATURED_COMPETITIONS = [
+  { name: 'Besta deild karla', id: '7025510', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025510', key: 'besta-deild-karla', badge: 'Úrvalsdeild' },
+  { name: 'Besta deild kvenna', id: '7025645', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025645', key: 'besta-deild-kvenna', badge: 'Úrvalsdeild' },
+  { name: 'Lengjudeild karla', id: '190359', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=190359', key: 'lengjudeild-karla', badge: 'Lengjudeild' },
+  { name: 'Lengjudeild kvenna', id: '190375', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=190375', key: 'lengjudeild-kvenna', badge: 'Lengjudeild' }
+];
+
 const MONTHS = {
   'janúar': 0, 'januar': 0, 'jan': 0,
   'febrúar': 1, 'februar': 1, 'feb': 1,
@@ -138,9 +145,62 @@ function getCompetitionMeta(linkMap, competition) {
   return { name: competition, url: '', id: '', key: slug(competition), source: '' };
 }
 
-function parseKsi(html) {
+
+function isUsefulToken(line) {
+  const text = clean(line);
+  return text && !/^Image:?/i.test(text) && !/^(Sjá mót|Sjá leikskýrslu|Atburðir|Leikskýrsla|Staða|Innbyrðis)$/i.test(text);
+}
+
+function parseTeamsFromWindow(lines, startIndex) {
+  const windowLines = lines.slice(startIndex, startIndex + 16).filter(isUsefulToken);
+  for (const line of windowLines) {
+    if (/\s+-\s+/.test(line) && !DAY_RE.test(line) && !/^\d+\s*-\s*\d+$/.test(line)) {
+      const parts = line.split(/\s+-\s+/);
+      if (parts.length >= 2) return { home: normalizeName(parts[0]), away: normalizeName(parts.slice(1).join(' - ')), teamsLine: line };
+    }
+  }
+  for (let i = 0; i < windowLines.length; i++) {
+    const line = windowLines[i];
+    if (line === '-' || /^[-–—]$/.test(line)) {
+      const home = normalizeName(windowLines[i - 1] || '');
+      const away = normalizeName(windowLines[i + 1] || '');
+      if (home && away) return { home, away, teamsLine: `${home} - ${away}` };
+    }
+  }
+  return { home: '', away: '', teamsLine: '' };
+}
+
+function collectMatchReportLinks($) {
+  const links = [];
+  $('a[href*="/leikir-og-urslit/felagslid/leikur"]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    const context = clean([$(el).text(), $(el).parent().text(), $(el).closest('tr, li, article, div').text()].join(' ')).slice(0, 1200);
+    if (href) links.push({ url: absoluteKsiUrl(href), context });
+  });
+  return links;
+}
+
+function findMatchReportUrl(links, home, away, time = '') {
+  const h = normalizeKey(home);
+  const a = normalizeKey(away);
+  const t = clean(time);
+  for (const link of links) {
+    const ctx = normalizeKey(link.context);
+    const hasTeams = ctx.includes(h) && ctx.includes(a);
+    const hasTime = !t || link.context.includes(t);
+    if (hasTeams && hasTime) return link.url;
+  }
+  for (const link of links) {
+    const ctx = normalizeKey(link.context);
+    if (ctx.includes(h) && ctx.includes(a)) return link.url;
+  }
+  return '';
+}
+
+function parseKsi(html, options = {}) {
   const $ = cheerio.load(html);
   const competitionLinks = collectCompetitionLinks($);
+  const reportLinks = collectMatchReportLinks($);
   const lines = $('body').text().split('\n').map(clean).filter(Boolean);
   const matches = [];
   let currentDateLabel = '';
@@ -156,30 +216,24 @@ function parseKsi(html) {
     const rawTime = line;
     const start = parseIcelandicDate(tm[2], tm[3], tm[4]);
     const venue = lines[i + 1] || '';
-    let competition = lines[i + 2] || '';
-    let teamsLine = '';
-    let j = i + 3;
-    while (j < Math.min(i + 13, lines.length)) {
-      if (/\s+-\s+/.test(lines[j]) && !DAY_RE.test(lines[j])) {
-        teamsLine = lines[j];
-        break;
-      }
-      j++;
-    }
-    if (!teamsLine) continue;
-    const [homeRaw, awayRaw] = teamsLine.split(/\s+-\s+/);
-    const home = normalizeName(homeRaw);
-    const away = normalizeName(awayRaw);
+    let competition = clean((lines[i + 2] || '').replace(/^Image:?/i, ''));
+    const parsedTeams = parseTeamsFromWindow(lines, i + 3);
+    const home = parsedTeams.home;
+    const away = parsedTeams.away;
     if (!home || !away) continue;
-    competition = clean(competition.replace(/^Image:?/i, ''));
+    if (!competition || /^[-–—]$/.test(competition)) competition = options.name || '';
     const meta = getCompetitionMeta(competitionLinks, competition);
+    const officialMeta = options.id && normalizeKey(options.name || '') === normalizeKey(competition) ? options : null;
     const startIso = start ? start.toISOString() : null;
+    const reportUrl = findMatchReportUrl(reportLinks, home, away, tm[4]);
+    const compUrl = officialMeta?.url || meta.url || options.url || '';
+    const compId = officialMeta?.id || meta.id || options.id || '';
 
     matches.push({
       id: makeId('ksi', startIso || rawTime, home, away, competition),
       source: 'KSÍ',
-      sourceUrl: meta.url || SOURCES.ksi,
-      matchReportUrl: meta.url || '',
+      sourceUrl: reportUrl || compUrl || SOURCES.ksi,
+      matchReportUrl: reportUrl || '',
       dateLabel: currentDateLabel,
       rawTime,
       startTime: startIso,
@@ -187,8 +241,8 @@ function parseKsi(html) {
       venue,
       competition,
       competitionKey: slug(competition),
-      competitionId: meta.id || '',
-      competitionUrl: meta.url || '',
+      competitionId: compId || '',
+      competitionUrl: compUrl || '',
       home,
       away,
       score: '',
@@ -205,10 +259,39 @@ function parseFotbolti(html) {
   let dateLabel = '';
   let competition = '';
 
-  for (const line of lines) {
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
     if (DATE_LINE_RE.test(line)) { dateLabel = line; continue; }
     if (/^(Besta|Lengjudeild|[2-5]\. deild|Mjólkurbikar|Inkasso|Fótbolti\.net|Úrslit|Textalýsingar)/i.test(line) && line.length < 80 && !/\d+\s*-\s*\d+/.test(line)) {
       competition = line;
+      continue;
+    }
+
+    let quick = line.match(/^(\d{1,2}:\d{2})\s*\|\s*(.+?)\s*-\s*(.+?)\.?$/);
+    if (quick) {
+      const home = normalizeName(quick[2]);
+      const away = normalizeName(quick[3]);
+      const venueLine = clean(lines[idx + 1] || '').replace(/^@\s*/, '');
+      if (home && away && home.length < 60 && away.length < 60) {
+        matches.push({
+          id: makeId('fotbolti', `${dateLabel}-${quick[1]}`, home, away, competition),
+          source: 'Fótbolti.net',
+          sourceUrl: SOURCES.fotbolti,
+          dateLabel,
+          rawTime: quick[1],
+          startTime: null,
+          localTime: quick[1],
+          venue: venueLine,
+          competition,
+          competitionKey: slug(competition),
+          competitionId: '',
+          competitionUrl: '',
+          home,
+          away,
+          score: '',
+          status: 'á dagskrá'
+        });
+      }
       continue;
     }
 
@@ -296,6 +379,14 @@ async function getAllMatches() {
     matches = matches.concat(parseKsi(await fetchText(SOURCES.ksi)));
   } catch (err) {
     errors.push(`KSÍ: ${err.message}`);
+  }
+
+  for (const comp of FEATURED_COMPETITIONS) {
+    try {
+      matches = matches.concat(parseKsi(await fetchText(comp.url), comp));
+    } catch (err) {
+      errors.push(`${comp.name}: ${err.message}`);
+    }
   }
 
   try {
@@ -676,15 +767,27 @@ function summarizeCompetitions(matches) {
     if (m.away) item.teams.add(m.away);
     map.set(m.competitionKey, item);
   }
+  for (const comp of FEATURED_COMPETITIONS) {
+    const key = comp.key || slug(comp.name);
+    const item = map.get(key) || {
+      key, name: comp.name, id: comp.id, url: comp.url, matchCount: 0, resultCount: 0, upcomingCount: 0, liveCount: 0, teams: new Set()
+    };
+    item.id = item.id || comp.id;
+    item.url = item.url || comp.url;
+    item.featured = true;
+    item.badge = comp.badge;
+    map.set(key, item);
+  }
   return Array.from(map.values()).map(item => ({
     ...item,
-    teams: Array.from(item.teams).sort((a, b) => a.localeCompare(b, 'is')).slice(0, 12),
+    teams: Array.from(item.teams || []).sort((a, b) => a.localeCompare(b, 'is')).slice(0, 12),
     hasOfficialLink: Boolean(item.url || item.id)
-  })).sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name, 'is'));
+  })).sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b.matchCount - a.matchCount || a.name.localeCompare(b.name, 'is'));
 }
 
 module.exports = {
   SOURCES,
+  FEATURED_COMPETITIONS,
   slug,
   clean,
   parseScore,

@@ -1,6 +1,6 @@
 {
   "name": "fotboltavaktin",
-  "version": "0.7.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Netlify-ready PWA með leikskýrslu, live pulse, síma-app polish og betri Match Center.",
   "scripts": {

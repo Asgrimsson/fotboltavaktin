@@ -10,7 +10,13 @@ const state = {
   competitions: [],
   theme: localStorage.getItem('fotboltavaktin.theme') || 'dark',
   lastSnapshot: JSON.parse(localStorage.getItem('fotboltavaktin.scoreSnapshot') || '{}'),
-  installPrompt: null
+  installPrompt: null,
+  featuredCompetitions: [
+    { name: 'Besta deild karla', key: 'besta-deild-karla', id: '7025510', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025510', badge: 'Úrvalsdeild' },
+    { name: 'Besta deild kvenna', key: 'besta-deild-kvenna', id: '7025645', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025645', badge: 'Úrvalsdeild' },
+    { name: 'Lengjudeild karla', key: 'lengjudeild-karla', id: '190359', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=190359', badge: 'Lengjudeild' },
+    { name: 'Lengjudeild kvenna', key: 'lengjudeild-kvenna', id: '190375', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=190375', badge: 'Lengjudeild' }
+  ]
 };
 
 const els = {
@@ -35,7 +41,9 @@ const els = {
   toastStack: document.querySelector('#toastStack'),
   themeBtn: document.querySelector('#themeBtn'),
   installBtn: document.querySelector('#installBtn'),
-  dailyStars: document.querySelector('#dailyStars')
+  dailyStars: document.querySelector('#dailyStars'),
+  featuredLeagues: document.querySelector('#featuredLeagues'),
+  matchdayDashboard: document.querySelector('#matchdayDashboard')
 };
 
 function escapeHtml(value) {
@@ -61,6 +69,14 @@ function isSameIcelandDay(iso, offset = 0) {
   if (!iso) return false;
   const matchKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Atlantic/Reykjavik', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
   return matchKey === dayKey(iso, offset);
+}
+function isTodayMatch(match) {
+  return isSameIcelandDay(match.startTime);
+}
+function isUpcomingMatch(match) {
+  if (hasScore(match)) return false;
+  if (!match.startTime) return match.status !== 'lokið';
+  return new Date(match.startTime).getTime() >= Date.now() - 7200000;
 }
 function normalizeTeamsInput(value) { return value.split(',').map(s => s.trim()).filter(Boolean); }
 function includesAnyTeam(match, teams) {
@@ -99,8 +115,8 @@ function getFilteredMatches() {
   const q = state.query.toLowerCase().trim();
   let items = [...state.matches];
   if (state.activeFilter === 'now') items = items.filter(m => m.status === 'í gangi');
-  if (state.activeFilter === 'today') items = items.filter(m => isSameIcelandDay(m.startTime));
-  if (state.activeFilter === 'upcoming') items = items.filter(m => !hasScore(m) && (!m.startTime || new Date(m.startTime).getTime() >= Date.now() - 7200000)).slice(0, 60);
+  if (state.activeFilter === 'today') items = items.filter(isTodayMatch);
+  if (state.activeFilter === 'upcoming') items = items.filter(isUpcomingMatch).slice(0, 80);
   if (state.activeFilter === 'results') items = items.filter(hasScore);
   if (state.activeFilter === 'mine') items = items.filter(m => includesAnyTeam(m, state.mine));
   if (state.activeFilter === 'watch') items = items.filter(isWatchMatch);
@@ -118,7 +134,7 @@ function renderStatus() {
 }
 function renderMetrics() {
   els.metricNow.textContent = state.matches.filter(m => m.status === 'í gangi').length;
-  els.metricToday.textContent = state.matches.filter(m => isSameIcelandDay(m.startTime)).length;
+  els.metricToday.textContent = state.matches.filter(isTodayMatch).length;
   els.metricResults.textContent = state.matches.filter(hasScore).length;
   els.metricTotal.textContent = state.matches.length;
 }
@@ -189,7 +205,7 @@ function renderCards() {
     els.cards.appendChild(node);
   });
 }
-function render() { renderStatus(); renderMetrics(); renderWatchDashboard(); renderDailyStars(); renderLeagues(); renderCompetitions(); renderCards(); }
+function render() { renderStatus(); renderMetrics(); renderMatchday(); renderFeaturedLeagues(); renderWatchDashboard(); renderDailyStars(); renderLeagues(); renderCompetitions(); renderCards(); }
 
 function formIcon(value) {
   const v = String(value || '').toUpperCase();
@@ -314,9 +330,73 @@ function matchIntelligenceMarkup(data) {
       </details>
     </section>`;
 }
+
+function getFeaturedMeta(key) {
+  return state.featuredCompetitions.find(c => c.key === key) || state.competitions.find(c => c.key === key) || null;
+}
+function setFilter(filter) {
+  state.activeFilter = filter;
+  document.querySelectorAll('.controls .tab').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+  render();
+}
+function renderMatchday() {
+  if (!els.matchdayDashboard) return;
+  const today = state.matches.filter(isTodayMatch);
+  const live = today.filter(m => m.status === 'í gangi');
+  const results = today.filter(hasScore);
+  const featuredToday = today.filter(m => state.featuredCompetitions.some(c => m.competitionKey === c.key || (m.competition || '').toLowerCase().includes(c.name.toLowerCase())));
+  const next = today.filter(isUpcomingMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)))[0];
+  const title = today.length ? `${today.length} leikir í dag` : 'Engir leikir í dag í sóttum gögnum';
+  els.matchdayDashboard.innerHTML = `
+    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.1</p><h2>${escapeHtml(title)}</h2></div><span>raðað eftir mikilvægi</span></div>
+    <div class="matchday-grid">
+      <button class="metric action-metric" type="button" data-jump-filter="now"><strong>${live.length}</strong><span>í gangi</span></button>
+      <button class="metric action-metric" type="button" data-jump-filter="today"><strong>${today.length}</strong><span>í dag</span></button>
+      <button class="metric action-metric" type="button" data-jump-filter="results"><strong>${results.length}</strong><span>úrslit í dag</span></button>
+      <button class="metric action-metric" type="button" data-jump-filter="upcoming"><strong>${featuredToday.length}</strong><span>úr úrvalsdeildum</span></button>
+    </div>
+    ${next ? `<button class="next-kickoff" type="button" data-id="${escapeHtml(next.id)}"><b>Næsti leikur:</b> ${escapeHtml(next.home)} – ${escapeHtml(next.away)} · ${escapeHtml(fmtTime(next.startTime, next.localTime || next.rawTime))}</button>` : ''}`;
+  els.matchdayDashboard.querySelectorAll('[data-jump-filter]').forEach(btn => btn.addEventListener('click', () => setFilter(btn.dataset.jumpFilter)));
+  els.matchdayDashboard.querySelectorAll('[data-id]').forEach(btn => btn.addEventListener('click', () => openMatch(btn.dataset.id)));
+}
+function renderFeaturedLeagues() {
+  if (!els.featuredLeagues) return;
+  const summaries = state.featuredCompetitions.map(comp => {
+    const fromServer = state.competitions.find(c => c.key === comp.key || c.id === comp.id) || {};
+    const related = state.matches.filter(m => m.competitionKey === comp.key || m.competitionId === comp.id || normalizeText(m.competition).includes(normalizeText(comp.name)));
+    const today = related.filter(isTodayMatch).length;
+    const upcoming = related.filter(isUpcomingMatch).length;
+    const results = related.filter(hasScore).length;
+    return { ...comp, ...fromServer, matchCount: related.length || fromServer.matchCount || 0, today, upcoming, results };
+  });
+  els.featuredLeagues.innerHTML = `
+    <div class="section-heading"><div><p class="eyebrow">Fastar deildir</p><h2>Úrvalsdeildir + Lengjudeildir</h2></div><span>alltaf tiltækar</span></div>
+    <div class="featured-grid">${summaries.map(item => `
+      <article class="featured-card">
+        <span class="source-badge official">${escapeHtml(item.badge || 'KSÍ')}</span>
+        <h3>${escapeHtml(item.name)}</h3>
+        <p>${item.matchCount || 0} leikir sóttir · ${item.today || 0} í dag · ${item.upcoming || 0} framundan</p>
+        <div class="competition-actions">
+          <button class="mini-btn featured-open" type="button" data-key="${escapeHtml(item.key)}" data-name="${escapeHtml(item.name)}" data-url="${escapeHtml(item.url || '')}" data-id="${escapeHtml(item.id || '')}">Opna deild</button>
+          <button class="mini-btn featured-filter" type="button" data-key="${escapeHtml(item.key)}">Sía leiki</button>
+          <button class="mini-btn league-fav" type="button" data-name="${escapeHtml(item.name)}">+ Mín vakt</button>
+        </div>
+      </article>`).join('')}</div>`;
+  els.featuredLeagues.querySelectorAll('.featured-open').forEach(btn => btn.addEventListener('click', () => openCompetition(btn.dataset)));
+  els.featuredLeagues.querySelectorAll('.featured-filter').forEach(btn => btn.addEventListener('click', () => { state.activeLeague = btn.dataset.key; setFilter('all'); }));
+  els.featuredLeagues.querySelectorAll('.league-fav').forEach(btn => btn.addEventListener('click', () => {
+    const name = btn.dataset.name;
+    if (name && !state.favoriteLeagues.some(x => x.toLowerCase() === name.toLowerCase())) state.favoriteLeagues.push(name);
+    localStorage.setItem('fotboltavaktin.leagues', JSON.stringify(state.favoriteLeagues));
+    if (els.leagues) els.leagues.value = state.favoriteLeagues.join(', ');
+    render();
+  }));
+}
+function normalizeText(value) { return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
 function renderDailyStars() {
   if (!els.dailyStars) return;
-  const today = state.matches.filter(m => isSameIcelandDay(m.startTime));
+  const today = state.matches.filter(isTodayMatch);
   const live = today.filter(m => m.status === 'í gangi');
   const scored = today.filter(hasScore).sort((a, b) => {
     const sa = scoreNumbers(a); const sb = scoreNumbers(b);
@@ -334,7 +414,7 @@ function renderDailyStars() {
   }
   const busyLeague = Array.from(leagueCounts.entries()).sort((a,b)=>b[1]-a[1])[0];
   els.dailyStars.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.0</p><h2>Stjörnur dagsins</h2></div><span>sjálfvirkt val úr leikjum</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.1</p><h2>Stjörnur dagsins</h2></div><span>sjálfvirkt val úr leikjum</span></div>
     <div class="stars-grid">
       <button class="star-card main-star" type="button" data-id="${escapeHtml(pick.id)}"><span>⭐ Leikur dagsins</span><strong>${escapeHtml(pick.home)} – ${escapeHtml(pick.away)}</strong><small>${escapeHtml(shortDateTime(pick))} · ${escapeHtml(pick.competition || '')}</small></button>
       <article class="star-card"><span>⚡ Live núna</span><strong>${live.length}</strong><small>leikir í gangi í dag</small></article>
@@ -347,9 +427,9 @@ function renderDailyStars() {
 function renderWatchDashboard() {
   if (!els.watchDashboard) return;
   const watch = state.matches.filter(isWatchMatch);
-  const today = watch.filter(m => isSameIcelandDay(m.startTime));
+  const today = watch.filter(isTodayMatch);
   const live = watch.filter(m => m.status === 'í gangi');
-  const next = watch.filter(m => !hasScore(m) && (!m.startTime || new Date(m.startTime).getTime() >= Date.now() - 7200000)).slice(0, 5);
+  const next = watch.filter(isUpcomingMatch).slice(0, 5);
   if (!state.mine.length && !state.favoriteLeagues.length) {
     els.watchDashboard.innerHTML = `<div class="watch-empty"><strong>Settu upp Mína vakt</strong><span>Skrifaðu lið og/eða deildir í reitina hér fyrir ofan. Þá færðu persónulegt yfirlit hér.</span></div>`;
     return;
@@ -370,7 +450,7 @@ function renderCompetitions() {
   const items = state.competitions.length ? state.competitions : Array.from(new Map(state.matches.map(m => [m.competitionKey, { key: m.competitionKey, name: m.competition, matchCount: 1, resultCount: hasScore(m) ? 1 : 0, upcomingCount: hasScore(m) ? 0 : 1, liveCount: m.status === 'í gangi' ? 1 : 0, hasOfficialLink: Boolean(m.competitionUrl), url: m.competitionUrl, id: m.competitionId }])).values()).filter(x => x.key && x.name);
   if (!items.length) { els.competitionOverview.innerHTML = ''; return; }
   els.competitionOverview.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">v1.0</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
+    <div class="section-heading"><div><p class="eyebrow">v1.1</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
     <div class="competition-grid">${items.slice(0, 18).map(item => `
       <article class="competition-card">
         <div><h3>${escapeHtml(item.name)}</h3><p>${item.matchCount || 0} leikir · ${item.resultCount || 0} úrslit · ${item.upcomingCount || 0} framundan</p></div>
@@ -633,12 +713,7 @@ async function loadMatches() {
 }
 
 document.querySelectorAll('.controls .tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.controls .tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    state.activeFilter = btn.dataset.filter;
-    renderCards();
-  });
+  btn.addEventListener('click', () => setFilter(btn.dataset.filter));
 });
 els.refresh.addEventListener('click', loadMatches);
 els.search.addEventListener('input', e => { state.query = e.target.value; renderCards(); });

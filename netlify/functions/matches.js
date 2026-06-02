@@ -11,11 +11,11 @@ exports.handler = async () => {
       },
       body: JSON.stringify({
         ok: true,
-        version: '0.3.0',
+        version: '1.1.0',
         updatedAt: new Date().toISOString(),
         count: matches.length,
         sources: SOURCES,
-        note: 'KSÍ er aðalheimild. v0.3 reynir að tengja leiki við opinberar KSÍ mótasíður og stöðutöflur. Í gangi er stundum reiknað út frá leiktíma ef lifandi staða finnst ekki.',
+        note: 'KSÍ er aðalheimild. v1.1 sækir líka fastar úrvalsdeildir og bætir leikdag/yfirlit. Í gangi er stundum reiknað út frá leiktíma ef lifandi staða finnst ekki.',
         errors,
         matches
       })

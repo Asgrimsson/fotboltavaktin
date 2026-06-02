@@ -265,3 +265,67 @@ a:hover { text-decoration: underline; }
 [data-theme="light"] .intelligence-grid article { background: rgba(255,255,255,.62); }
 @media (max-width: 900px) { .stars-grid, .intelligence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .stars-grid, .intelligence-grid { grid-template-columns: 1fr; } .star-card { min-height: auto; } }
+
+/* v1.1 — Úrvalsdeildir + Leikdagur */
+.matchday-dashboard,
+.featured-leagues {
+  margin: 18px 0;
+}
+.matchday-grid,
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.action-metric {
+  cursor: pointer;
+  text-align: left;
+  border: 1px solid var(--border);
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.action-metric:hover,
+.featured-card:hover,
+.next-kickoff:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 197, 94, .55);
+}
+.next-kickoff {
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(34, 197, 94, .35);
+  background: linear-gradient(135deg, rgba(34,197,94,.15), rgba(59,130,246,.08));
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.featured-card {
+  background: linear-gradient(145deg, rgba(15, 23, 42, .92), rgba(6, 78, 59, .55));
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: var(--shadow-soft);
+  transition: transform .18s ease, border-color .18s ease;
+}
+.featured-card h3 {
+  margin: 10px 0 6px;
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+}
+.featured-card p {
+  margin: 0 0 14px;
+  color: var(--muted);
+}
+html[data-theme="light"] .featured-card {
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(220,252,231,.82));
+}
+@media (max-width: 920px) {
+  .matchday-grid,
+  .featured-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .matchday-grid,
+  .featured-grid { grid-template-columns: 1fr; }
+  .featured-card .competition-actions { flex-direction: column; align-items: stretch; }
+  .featured-card .mini-btn { width: 100%; }
+}
