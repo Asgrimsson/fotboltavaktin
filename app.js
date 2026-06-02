@@ -1,6 +1,6 @@
 const state = {
   matches: [],
-  activeFilter: 'now',
+  activeFilter: 'today',
   activeLeague: '',
   query: '',
   mine: JSON.parse(localStorage.getItem('fotboltavaktin.mine') || '[]'),
@@ -135,7 +135,7 @@ function renderStatus() {
   const mine = state.mine.length ? state.mine.join(', ') : 'engin valin';
   const leagues = state.favoriteLeagues.length ? state.favoriteLeagues.join(', ') : 'engar valdar';
   const extra = state.errors.length ? `<span>Viðvörun: ${state.errors.length} heimild gaf ekki full gögn</span>` : '';
-  els.status.innerHTML = `<span>Síðast uppfært ${updated}</span><span>Aðalheimild: KSÍ</span><span>Fókus: 2.–5. deild fullorðinna</span><span>Bestu deildir og Lengjudeildir faldar</span><span>Mín lið: ${escapeHtml(mine)}</span><span>Mínar deildir: ${escapeHtml(leagues)}</span>${extra}`;
+  els.status.innerHTML = `<span>Síðast uppfært ${updated}</span><span>Aðalheimild: KSÍ</span><span>Fókus: neðri deildir karla</span><span>Beint af KSÍ mótasíðum</span><span>Mín lið: ${escapeHtml(mine)}</span><span>Mínar deildir: ${escapeHtml(leagues)}</span>${extra}`;
 }
 function renderMetrics() {
   const v = visibleMatches();
@@ -183,9 +183,19 @@ function renderLeagues() {
   });
 }
 function renderCards() {
-  const items = getFilteredMatches();
+  let items = getFilteredMatches();
+  const fullCount = items.length;
+  // Vefurinn heldur aðallistanum stuttum: topp 10 nema notandi sé að leita eða opna ákveðna deild.
+  const shouldLimit = !state.query && !state.activeLeague && ['today','now','upcoming','all'].includes(state.activeFilter);
+  if (shouldLimit) items = items.slice(0, 10);
   els.cards.innerHTML = '';
   els.empty.classList.toggle('hidden', items.length > 0);
+  if (fullCount > items.length) {
+    const note = document.createElement('div');
+    note.className = 'list-note';
+    note.innerHTML = `<strong>Sýni topp 10</strong><span>${fullCount} leikir passa við valið. Notaðu leit eða deildarval til að þrengja.</span>`;
+    els.cards.appendChild(note);
+  }
   items.forEach(match => {
     const node = els.template.content.cloneNode(true);
     const card = node.querySelector('.match-card');
@@ -354,7 +364,7 @@ function renderMatchday() {
   const next = today.filter(isUpcomingMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)))[0];
   const title = today.length ? `${today.length} leikir í dag` : 'Engir leikir í dag í sóttum gögnum';
   els.matchdayDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.4</p><h2>${escapeHtml(title)}</h2></div><span>2.–5. deild · fullorðinslið</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.5</p><h2>${escapeHtml(title)}</h2></div><span>2.–5. deild · fullorðinslið</span></div>
     <div class="matchday-grid">
       <button class="metric action-metric" type="button" data-jump-filter="now"><strong>${live.length}</strong><span>í gangi</span></button>
       <button class="metric action-metric" type="button" data-jump-filter="today"><strong>${today.length}</strong><span>í dag</span></button>
@@ -373,7 +383,7 @@ function renderTopTen() {
     .slice(0, 10);
   if (!list.length) { els.topTenDashboard.innerHTML = ''; return; }
   els.topTenDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Snilld v1.4</p><h2>Top 10 leikir</h2></div><span>live + næstu leikir fyrst</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Snilld v1.5</p><h2>Top 10 leikir</h2></div><span>live + næstu leikir fyrst</span></div>
     <div class="topten-list">${list.map((m, i) => `
       <button class="topten-item" type="button" data-id="${escapeHtml(m.id)}">
         <b>${i + 1}. ${escapeHtml(m.home)} – ${escapeHtml(m.away)}</b>
@@ -404,7 +414,7 @@ function renderDailyStars() {
   }
   const busyLeague = Array.from(leagueCounts.entries()).sort((a,b)=>b[1]-a[1])[0];
   els.dailyStars.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.4</p><h2>Stjörnur dagsins</h2></div><span>neðri deildir · smelltu á Live núna</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.5</p><h2>Stjörnur dagsins</h2></div><span>neðri deildir · smelltu á Live núna</span></div>
     <div class="stars-grid">
       <button class="star-card main-star" type="button" data-id="${escapeHtml(pick.id)}"><span>⭐ Leikur dagsins</span><strong>${escapeHtml(pick.home)} – ${escapeHtml(pick.away)}</strong><small>${escapeHtml(shortDateTime(pick))} · ${escapeHtml(pick.competition || '')}</small></button>
       <button class="star-card" type="button" data-jump-filter="now"><span>⚡ Live núna</span><strong>${live.length}</strong><small>${live.length ? 'smelltu til að sjá leikina' : 'enginn leikur í gangi núna'}</small></button>
@@ -427,7 +437,7 @@ function renderWatchDashboard() {
     return;
   }
   els.watchDashboard.innerHTML = `
-    <div class="section-heading compact-heading"><div><p class="eyebrow">v1.4</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
+    <div class="section-heading compact-heading"><div><p class="eyebrow">v1.5</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
     <div class="watch-grid">
       <article class="watch-card live"><strong>${live.length}</strong><span>í gangi hjá mínum liðum/deildum</span></article>
       <article class="watch-card"><strong>${today.length}</strong><span>í dag í minni vakt</span></article>
@@ -443,7 +453,7 @@ function renderCompetitions() {
   items = items.filter(item => /(^|\s)(2|3|4|5)\.??\s*deild/i.test(item.name || '') && !/besta\s+deild|lengjudeild|flokkur/i.test(item.name || ''));
   if (!items.length) { els.competitionOverview.innerHTML = ''; return; }
   els.competitionOverview.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">v1.4</p><h2>Neðri deildir</h2></div><span>${items.length} mót/riðlar fundust</span></div>
+    <div class="section-heading"><div><p class="eyebrow">v1.5</p><h2>Neðri deildir</h2></div><span>${items.length} mót/riðlar fundust</span></div>
     <div class="competition-grid">${items.slice(0, 18).map(item => `
       <article class="competition-card">
         <div><h3>${escapeHtml(item.name)}</h3><p>${item.matchCount || 0} leikir · ${item.resultCount || 0} úrslit · ${item.upcomingCount || 0} framundan</p></div>

@@ -6,7 +6,15 @@ const SOURCES = {
   urslit: 'https://www.urslit.net/'
 };
 
-const FEATURED_COMPETITIONS = [];
+// v1.5: Sækjum neðri fullorðinsdeildir beint af mótasíðum KSÍ.
+// Þetta lagar að grunnsíðan /felagslid/ skili stundum aðeins örfáum leikjum.
+const FEATURED_COMPETITIONS = [
+  { name: '2. deild karla', id: '7025548', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025548' },
+  { name: '3. deild karla', id: '7025551', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025551' },
+  { name: '4. deild karla', id: '7025560', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025560' },
+  { name: '5. deild karla A riðill', id: '7025573', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025573' },
+  { name: '5. deild karla B riðill', id: '7025587', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025587' }
+];
 
 const MONTHS = {
   'janúar': 0, 'januar': 0, 'jan': 0,
@@ -88,7 +96,8 @@ function statusFromStart(startIso, score) {
   if (!startIso) return 'á dagskrá';
   const now = Date.now();
   const start = new Date(startIso).getTime();
-  const end = start + 2 * 60 * 60 * 1000;
+  // Leikir geta tafist eða farið í uppbótartíma; gefum rúman 135 mín. glugga.
+  const end = start + 135 * 60 * 1000;
   if (now >= start && now <= end) return 'í gangi';
   if (now > end) return 'líklega lokið';
   return 'á eftir';
@@ -101,7 +110,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/1.2 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/1.5 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -416,8 +425,8 @@ async function getAllMatches() {
     }
   }
 
-  // v1.2: KSÍ er eina gagnaveitan fyrir leiki og leikskýrslur.
-  // Fótbolti.net var fjarlægt sem fallback þar sem fréttalínur gátu ranglega birst sem atburðir.
+  // KSÍ er eina gagnaveitan fyrir leiki og leikskýrslur.
+  // Fótbolti.net er ekki notað þar sem fréttalínur gátu ranglega birst sem atburðir.
   try {
     await fetchText(SOURCES.urslit);
   } catch (err) {

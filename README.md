@@ -1,3 +1,3 @@
-# Fótboltavaktin v1.4
+# Fótboltavaktin v1.5
 
-KSÍ-only útgáfa fyrir neðri fullorðinsdeildir: 2.–5. deild. Bestu deildir, Lengjudeildir og yngri flokkar eru falin.
+Lagar gagnasöfnun: sækir neðri deildir karla beint af KSÍ mótasíðum og heldur aðallista í topp 10.

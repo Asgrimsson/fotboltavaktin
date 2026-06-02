@@ -337,3 +337,17 @@ html[data-theme="light"] .featured-card {
 .topten-item { text-align: left; border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; background: var(--card); color: var(--text); cursor: pointer; box-shadow: var(--shadow); }
 .topten-item b { display:block; font-size: 1rem; margin-bottom: 6px; }
 .topten-item span { color: var(--muted); font-weight: 700; font-size: .9rem; }
+.list-note{
+  grid-column:1/-1;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  padding:12px 16px;
+  border:1px solid rgba(139,255,178,.22);
+  background:rgba(16,185,129,.08);
+  border-radius:18px;
+  color:var(--muted);
+}
+.list-note strong{color:var(--text)}
+@media (max-width:720px){.list-note{display:block}.list-note span{display:block;margin-top:4px}}
