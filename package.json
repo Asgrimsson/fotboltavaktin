@@ -1,6 +1,6 @@
 {
   "name": "fotboltavaktin",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Netlify-ready PWA með KSÍ-gögnum, síu fyrir meistaraflokka, virkri Í gangi-talningu og hreinni leikskýrslu.",
   "scripts": {

@@ -6,12 +6,7 @@ const SOURCES = {
   urslit: 'https://www.urslit.net/'
 };
 
-const FEATURED_COMPETITIONS = [
-  { name: 'Besta deild karla', id: '7025510', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025510', key: 'besta-deild-karla', badge: 'Úrvalsdeild' },
-  { name: 'Besta deild kvenna', id: '7025645', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=7025645', key: 'besta-deild-kvenna', badge: 'Úrvalsdeild' },
-  { name: 'Lengjudeild karla', id: '190359', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=190359', key: 'lengjudeild-karla', badge: 'Lengjudeild' },
-  { name: 'Lengjudeild kvenna', id: '190375', url: 'https://www.ksi.is/oll-mot/mot?banner-tab=matches-and-results&id=190375', key: 'lengjudeild-kvenna', badge: 'Lengjudeild' }
-];
+const FEATURED_COMPETITIONS = [];
 
 const MONTHS = {
   'janúar': 0, 'januar': 0, 'jan': 0,
@@ -161,9 +156,16 @@ function isYouthCompetitionName(name) {
   return /(?:^|\s)(2|3|4|5)\s+flokkur(?:\s|$)/i.test(text);
 }
 
+function isLowerLeagueName(name) {
+  const text = normalizeKey(name || '');
+  if (/besta\s+deild|lengjudeild/.test(text)) return false;
+  if (isYouthCompetitionName(text)) return false;
+  return /(?:^|\s)(2|3|4|5)\.??\s*deild/.test(text);
+}
+
 function isAllowedMatch(match) {
   if (!match || !match.home || !match.away) return false;
-  if (isYouthCompetitionName(match.competition || '')) return false;
+  if (!isLowerLeagueName(match.competition || '')) return false;
   const teamText = normalizeKey(`${match.home} ${match.away}`);
   if (isYouthCompetitionName(teamText)) return false;
   return true;
@@ -786,17 +788,6 @@ function summarizeCompetitions(matches) {
     if (m.home) item.teams.add(m.home);
     if (m.away) item.teams.add(m.away);
     map.set(m.competitionKey, item);
-  }
-  for (const comp of FEATURED_COMPETITIONS) {
-    const key = comp.key || slug(comp.name);
-    const item = map.get(key) || {
-      key, name: comp.name, id: comp.id, url: comp.url, matchCount: 0, resultCount: 0, upcomingCount: 0, liveCount: 0, teams: new Set()
-    };
-    item.id = item.id || comp.id;
-    item.url = item.url || comp.url;
-    item.featured = true;
-    item.badge = comp.badge;
-    map.set(key, item);
   }
   return Array.from(map.values()).map(item => ({
     ...item,
