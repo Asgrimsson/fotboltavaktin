@@ -1,7 +1,7 @@
 {
   "name": "Fótboltavaktin",
   "short_name": "Boltavaktin",
-  "description": "Leikir í íslenskum fótbolta — í dag, í gangi og næst.",
+  "description": "Sjálfvirk live-vakt fyrir íslenskan fótbolta.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#07111f",

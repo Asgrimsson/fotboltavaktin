@@ -1,3 +1,3 @@
-# Fótboltavaktin v2.2
+# Fótboltavaktin v2.3
 
-Sjálfvirk live-vakt sem sækir einnig liðasíður KSÍ þegar leikur er í gangi.
+Símahæfari haus, minni texti og hraðari Match Center með skyndiopnun og cache.
