@@ -241,3 +241,27 @@ a:hover { text-decoration: underline; }
   .mini-stats { grid-template-columns: 1fr; }
   .teams h2 { font-size: 1.45rem; }
 }
+
+/* v1.0 — Fótboltamiðstöðin / Match Intelligence */
+.daily-stars { margin: 1rem 0 1.2rem; }
+.stars-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; }
+.star-card { border: 1px solid var(--border); background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03)); border-radius: 1.2rem; padding: 1rem; color: var(--text); text-align: left; min-height: 118px; display: flex; flex-direction: column; gap: .45rem; }
+.star-card span { color: var(--muted); font-weight: 800; font-size: .85rem; }
+.star-card strong { font-size: clamp(1.1rem, 2vw, 1.55rem); line-height: 1.05; }
+.star-card small { color: var(--muted); }
+.main-star { cursor: pointer; background: linear-gradient(135deg, rgba(34,197,94,.25), rgba(20,184,166,.09)); }
+.main-star:hover { transform: translateY(-1px); border-color: rgba(134,239,172,.7); }
+.intelligence-card { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border); border-radius: 1.35rem; background: linear-gradient(135deg, rgba(34,197,94,.14), rgba(15,23,42,.28)); }
+.intelligence-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin: .8rem 0; }
+.intelligence-grid article { border: 1px solid var(--border); border-radius: 1rem; padding: .9rem; background: rgba(2,6,23,.28); }
+.intelligence-grid span { display: block; color: var(--muted); font-size: .82rem; font-weight: 800; margin-bottom: .35rem; }
+.intelligence-grid strong { font-size: 1.55rem; }
+.intelligence-grid small { display: block; color: var(--muted); margin-top: .2rem; }
+.analysis-box { border-radius: 1rem; background: rgba(134,239,172,.08); border: 1px solid rgba(134,239,172,.22); padding: .8rem .95rem; margin: .75rem 0; }
+.analysis-box p { margin: .25rem 0; }
+.h2h-box { margin-top: .85rem; border: 1px solid var(--border); border-radius: 1rem; padding: .75rem .9rem; background: rgba(255,255,255,.04); }
+.h2h-box summary { cursor: pointer; font-weight: 900; }
+.h2h-summary { margin: .75rem 0; color: var(--muted); }
+[data-theme="light"] .intelligence-grid article { background: rgba(255,255,255,.62); }
+@media (max-width: 900px) { .stars-grid, .intelligence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .stars-grid, .intelligence-grid { grid-template-columns: 1fr; } .star-card { min-height: auto; } }

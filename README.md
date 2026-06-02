@@ -1,8 +1,8 @@
-# Fótboltavaktin v0.7
+# Fótboltavaktin v1.0
 
 Netlify-ready PWA fyrir íslenska fótboltaleiki.
 
-## Nýtt í v0.7
+## Nýtt í v1.0
 
 - Leikskýrsla + dómarar: reynir að lesa dómara, aðstoðardómara, atburði, mörk/spjöld og byrjunarlið úr opnum KSÍ/COMET gögnum þegar þau eru birt.
 - Live Pulse: sjálfvirk uppfærsla á 60 sekúndna fresti, staða merkt og toast-tilkynningar ef skor breytist.

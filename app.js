@@ -34,7 +34,8 @@ const els = {
   competitionOverview: document.querySelector('#competitionOverview'),
   toastStack: document.querySelector('#toastStack'),
   themeBtn: document.querySelector('#themeBtn'),
-  installBtn: document.querySelector('#installBtn')
+  installBtn: document.querySelector('#installBtn'),
+  dailyStars: document.querySelector('#dailyStars')
 };
 
 function escapeHtml(value) {
@@ -188,7 +189,7 @@ function renderCards() {
     els.cards.appendChild(node);
   });
 }
-function render() { renderStatus(); renderMetrics(); renderWatchDashboard(); renderLeagues(); renderCompetitions(); renderCards(); }
+function render() { renderStatus(); renderMetrics(); renderWatchDashboard(); renderDailyStars(); renderLeagues(); renderCompetitions(); renderCards(); }
 
 function formIcon(value) {
   const v = String(value || '').toUpperCase();
@@ -233,6 +234,116 @@ function tableMarkup(table, home, away) {
   const sourceLink = table.sourceUrl ? `<a href="${escapeHtml(table.sourceUrl)}" target="_blank" rel="noopener noreferrer">Opna KSÍ mótasíðu</a>` : '';
   return `${badge}<div class="table-wrap"><table class="standings"><thead><tr><th>#</th><th>Lið</th><th>L</th><th>U</th><th>J</th><th>T</th><th>Mörk</th><th>+/-</th><th>Stig</th><th>Form</th></tr></thead><tbody>${rows}</tbody></table></div><p class="data-note">${escapeHtml(table.sourceNote || '')} ${sourceLink}</p>`;
 }
+
+function scoreNumbers(match) {
+  const m = String(match.score || '').match(/(\d{1,2})\s*[-:]\s*(\d{1,2})/);
+  return m ? { home: Number(m[1]), away: Number(m[2]) } : null;
+}
+function rowForTeam(table, team) {
+  const rows = table?.rows || [];
+  const want = String(team || '').toLowerCase();
+  return rows.find(r => String(r.team || '').toLowerCase() === want)
+    || rows.find(r => String(r.team || '').toLowerCase().includes(want) || want.includes(String(r.team || '').toLowerCase()))
+    || null;
+}
+function pointsFromForm(form = []) {
+  return form.reduce((sum, x) => {
+    const v = String(x || '').toUpperCase();
+    if (v === 'U' || v === 'W') return sum + 3;
+    if (v === 'J' || v === 'D') return sum + 1;
+    return sum;
+  }, 0);
+}
+function h2hForMatch(match) {
+  const h = String(match.home || '').toLowerCase();
+  const a = String(match.away || '').toLowerCase();
+  const rows = state.matches.filter(m => {
+    const mh = String(m.home || '').toLowerCase();
+    const ma = String(m.away || '').toLowerCase();
+    return ((mh === h && ma === a) || (mh === a && ma === h)) && scoreNumbers(m);
+  }).slice(0, 8);
+  let homeWins = 0, awayWins = 0, draws = 0, goalsHome = 0, goalsAway = 0;
+  for (const r of rows) {
+    const sc = scoreNumbers(r);
+    const direct = String(r.home || '').toLowerCase() === h;
+    const hg = direct ? sc.home : sc.away;
+    const ag = direct ? sc.away : sc.home;
+    goalsHome += hg; goalsAway += ag;
+    if (hg > ag) homeWins++; else if (ag > hg) awayWins++; else draws++;
+  }
+  return { rows, homeWins, awayWins, draws, goalsHome, goalsAway };
+}
+function intelligenceLabel(home, away) {
+  if (!home?.rank || !away?.rank) return 'Gögn að safnast';
+  const diff = Math.abs(Number(home.rank) - Number(away.rank));
+  if (home.rank <= 3 && away.rank <= 3) return 'Toppslagur';
+  if (diff <= 2) return 'Jafn leikur';
+  if ((home.rank <= 2 && away.rank >= 6) || (away.rank <= 2 && home.rank >= 6)) return 'Styrkleikamunur';
+  return 'Áhugaverður leikur';
+}
+function avg(n, d) { return d ? (Number(n || 0) / d).toFixed(1) : '0.0'; }
+function matchIntelligenceMarkup(data) {
+  const m = data.match;
+  const home = data.teamStats.home;
+  const away = data.teamStats.away;
+  const h2h = h2hForMatch(m);
+  const homePlayed = Number(home.played || 0);
+  const awayPlayed = Number(away.played || 0);
+  const hForm = pointsFromForm(home.form || []);
+  const aForm = pointsFromForm(away.form || []);
+  const label = intelligenceLabel(home, away);
+  const h2hRows = h2h.rows.length ? h2h.rows.map(r => `<button class="league-match-row" type="button" data-id="${escapeHtml(r.id)}"><b>${escapeHtml(r.home)} ${escapeHtml(r.score)} ${escapeHtml(r.away)}</b><span>${escapeHtml(shortDateTime(r))} · ${escapeHtml(r.competition || '')}</span></button>`).join('') : '<p class="muted">Engar eldri viðureignir fundust í sóttum gögnum.</p>';
+  const facts = [];
+  if (home.rank && away.rank) facts.push(`${home.team} er í ${home.rank}. sæti og ${away.team} í ${away.rank}. sæti.`);
+  if (homePlayed && awayPlayed) facts.push(`${home.team}: ${avg(home.gf, homePlayed)} mörk í leik · ${avg(home.ga, homePlayed)} fengin. ${away.team}: ${avg(away.gf, awayPlayed)} mörk í leik · ${avg(away.ga, awayPlayed)} fengin.`);
+  if (hForm !== aForm) facts.push(`Form síðustu leikja gefur ${hForm > aForm ? home.team : away.team} forskot miðað við þau gögn sem fundust.`);
+  if (!facts.length) facts.push('Það vantar enn nægileg opinber gögn til að gera sterka leikgreiningu.');
+  return `
+    <section class="intelligence-card">
+      <div class="section-heading compact-heading"><div><p class="eyebrow">Match Intelligence</p><h3>${escapeHtml(label)}</h3></div><span>v1.0</span></div>
+      <div class="intelligence-grid">
+        <article><span>Form ${escapeHtml(home.team)}</span><strong>${hForm} stig</strong><div class="form-row">${(home.form || []).map(formIcon).join('') || '<span class="muted">—</span>'}</div></article>
+        <article><span>Form ${escapeHtml(away.team)}</span><strong>${aForm} stig</strong><div class="form-row">${(away.form || []).map(formIcon).join('') || '<span class="muted">—</span>'}</div></article>
+        <article><span>Sókn ${escapeHtml(home.team)}</span><strong>${avg(home.gf, homePlayed)}</strong><small>mörk í leik</small></article>
+        <article><span>Sókn ${escapeHtml(away.team)}</span><strong>${avg(away.gf, awayPlayed)}</strong><small>mörk í leik</small></article>
+      </div>
+      <div class="analysis-box">${facts.map(f => `<p>🤖 ${escapeHtml(f)}</p>`).join('')}</div>
+      <details class="h2h-box"><summary>Head-to-Head úr sóttum gögnum · ${h2h.rows.length} leikir</summary>
+        <div class="h2h-summary"><b>${escapeHtml(m.home)}</b> ${h2h.homeWins} sigrar · ${h2h.draws} jafntefli · <b>${escapeHtml(m.away)}</b> ${h2h.awayWins} sigrar · mörk ${h2h.goalsHome}:${h2h.goalsAway}</div>
+        ${h2hRows}
+      </details>
+    </section>`;
+}
+function renderDailyStars() {
+  if (!els.dailyStars) return;
+  const today = state.matches.filter(m => isSameIcelandDay(m.startTime));
+  const live = today.filter(m => m.status === 'í gangi');
+  const scored = today.filter(hasScore).sort((a, b) => {
+    const sa = scoreNumbers(a); const sb = scoreNumbers(b);
+    return ((sb?.home || 0) + (sb?.away || 0)) - ((sa?.home || 0) + (sa?.away || 0));
+  });
+  const watch = today.filter(isWatchMatch);
+  const upcoming = today.filter(m => !hasScore(m) && m.status !== 'líklega lokið');
+  const pick = live[0] || watch[0] || upcoming[0] || today[0] || state.matches[0];
+  if (!pick) { els.dailyStars.innerHTML = ''; return; }
+  const highScore = scored[0];
+  const leagueCounts = new Map();
+  for (const m of today) {
+    if (!m.competition) continue;
+    leagueCounts.set(m.competition, (leagueCounts.get(m.competition) || 0) + 1);
+  }
+  const busyLeague = Array.from(leagueCounts.entries()).sort((a,b)=>b[1]-a[1])[0];
+  els.dailyStars.innerHTML = `
+    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.0</p><h2>Stjörnur dagsins</h2></div><span>sjálfvirkt val úr leikjum</span></div>
+    <div class="stars-grid">
+      <button class="star-card main-star" type="button" data-id="${escapeHtml(pick.id)}"><span>⭐ Leikur dagsins</span><strong>${escapeHtml(pick.home)} – ${escapeHtml(pick.away)}</strong><small>${escapeHtml(shortDateTime(pick))} · ${escapeHtml(pick.competition || '')}</small></button>
+      <article class="star-card"><span>⚡ Live núna</span><strong>${live.length}</strong><small>leikir í gangi í dag</small></article>
+      <article class="star-card"><span>🎯 Markaleikur</span><strong>${highScore ? escapeHtml(`${highScore.home} ${highScore.score} ${highScore.away}`) : '—'}</strong><small>${highScore ? escapeHtml(highScore.competition || '') : 'Engin úrslit í dag enn'}</small></article>
+      <article class="star-card"><span>🏆 Mest virk deild</span><strong>${busyLeague ? escapeHtml(busyLeague[0]) : '—'}</strong><small>${busyLeague ? `${busyLeague[1]} leikir í dag` : 'Engin deild fundin'}</small></article>
+    </div>`;
+  els.dailyStars.querySelectorAll('[data-id]').forEach(btn => btn.addEventListener('click', () => openMatch(btn.dataset.id)));
+}
+
 function renderWatchDashboard() {
   if (!els.watchDashboard) return;
   const watch = state.matches.filter(isWatchMatch);
@@ -244,7 +355,7 @@ function renderWatchDashboard() {
     return;
   }
   els.watchDashboard.innerHTML = `
-    <div class="section-heading compact-heading"><div><p class="eyebrow">v0.7</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
+    <div class="section-heading compact-heading"><div><p class="eyebrow">v1.0</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
     <div class="watch-grid">
       <article class="watch-card live"><strong>${live.length}</strong><span>í gangi hjá mínum liðum/deildum</span></article>
       <article class="watch-card"><strong>${today.length}</strong><span>í dag í minni vakt</span></article>
@@ -259,7 +370,7 @@ function renderCompetitions() {
   const items = state.competitions.length ? state.competitions : Array.from(new Map(state.matches.map(m => [m.competitionKey, { key: m.competitionKey, name: m.competition, matchCount: 1, resultCount: hasScore(m) ? 1 : 0, upcomingCount: hasScore(m) ? 0 : 1, liveCount: m.status === 'í gangi' ? 1 : 0, hasOfficialLink: Boolean(m.competitionUrl), url: m.competitionUrl, id: m.competitionId }])).values()).filter(x => x.key && x.name);
   if (!items.length) { els.competitionOverview.innerHTML = ''; return; }
   els.competitionOverview.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">v0.7</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
+    <div class="section-heading"><div><p class="eyebrow">v1.0</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
     <div class="competition-grid">${items.slice(0, 18).map(item => `
       <article class="competition-card">
         <div><h3>${escapeHtml(item.name)}</h3><p>${item.matchCount || 0} leikir · ${item.resultCount || 0} úrslit · ${item.upcomingCount || 0} framundan</p></div>
@@ -302,10 +413,12 @@ async function openMatch(id) {
         <button class="tab active" data-detail-tab="overview">Yfirlit</button>
         <button class="tab" data-detail-tab="table">Tafla</button>
         <button class="tab" data-detail-tab="stats">Liðatölfræði</button>
+        <button class="tab" data-detail-tab="intelligence">Greining</button>
         <button class="tab" data-detail-tab="report">Leikskýrsla</button>
       </nav>
       <section data-panel="overview">
         <div class="fact-list">${(data.smartFacts || []).map(f => `<p>💡 ${escapeHtml(f)}</p>`).join('')}</div>
+        ${matchIntelligenceMarkup(data)}
         <div class="two-col">${teamPanel('Heimalið', homeStats)}${teamPanel('Útilið', awayStats)}</div>
         <a class="big-link" href="${escapeHtml(m.sourceUrl || '#')}" target="_blank" rel="noopener noreferrer">Opna upprunaheimild</a>
       </section>
@@ -318,10 +431,14 @@ async function openMatch(id) {
         <div class="compare-bar"><span style="width:${Math.min(100, Math.max(5, (homeStats.gf || 0) * 8))}%"></span></div>
         <p class="data-note">Skoruð mörk og fengin mörk koma úr opinberri KSÍ töflu ef hún fannst, annars úr reiknaðri varatöflu.</p>
       </section>
+      <section data-panel="intelligence" class="hidden">
+        ${matchIntelligenceMarkup(data)}
+      </section>
       <section data-panel="report" class="hidden">
         ${reportMarkup(data.report, m)}
       </section>`;
     els.detail.querySelectorAll('[data-detail-tab]').forEach(btn => btn.addEventListener('click', () => setDetailTab(btn.dataset.detailTab)));
+    els.detail.querySelectorAll('.h2h-box [data-id]').forEach(btn => btn.addEventListener('click', () => openMatch(btn.dataset.id)));
     setupDetailSwipe();
   } catch (err) {
     els.detail.innerHTML = `<div class="loading error">${escapeHtml(err.message)}</div>`;
@@ -464,7 +581,7 @@ function reportMarkup(report = {}, match = {}) {
     </div>`;
 }
 function setupDetailSwipe() {
-  const panels = ['overview', 'table', 'stats', 'report'];
+  const panels = ['overview', 'table', 'stats', 'intelligence', 'report'];
   let startX = 0;
   let startY = 0;
   els.detail.addEventListener('touchstart', e => {
