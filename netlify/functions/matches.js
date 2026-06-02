@@ -11,11 +11,11 @@ exports.handler = async () => {
       },
       body: JSON.stringify({
         ok: true,
-        version: '1.5.0',
+        version: '1.8.0',
         updatedAt: new Date().toISOString(),
         count: matches.length,
         sources: SOURCES,
-        note: "KSÍ-only. v1.5 sækir neðri fullorðinsdeildir beint af KSÍ mótasíðum: 2., 3., 4. og 5. deild karla. Bestu deildir/Lengjudeildir/yngri flokkar eru faldir.",
+        note: "KSÍ-only. v1.8 sækir sjálfvirkt neðri fullorðinsdeildir beint af KSÍ mótasíðum: 2., 3., 4. og 5. deild karla. Bestu deildir/Lengjudeildir/yngri flokkar eru faldir.",
         errors,
         matches
       })

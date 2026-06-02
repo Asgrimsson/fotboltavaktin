@@ -15,13 +15,13 @@
         <div class="brand">
           <div class="ball" aria-hidden="true">⚽</div>
           <div>
-            <p class="eyebrow">Íslenski boltinn · v1.7</p>
+            <p class="eyebrow">Íslenski boltinn · v1.8</p>
             <h1>Fótboltavaktin</h1>
           </div>
         </div>
         <div class="hero-actions"><button id="installBtn" class="ghost-btn hidden" type="button">Setja á heimaskjá</button><button id="themeBtn" class="ghost-btn" type="button">Ljós stilling</button><button id="refreshBtn" class="ghost-btn" type="button">Uppfæra</button></div>
       </div>
-      <p class="lead">Persónuleg fótboltamiðstöð fyrir neðri deildirnar: 2.–5. deild fullorðinna, KSÍ-gögn, Live Pulse og Match Intelligence.</p>
+      <p class="lead">Sjálfvirk live-vakt fyrir neðri deildir karla. Vefurinn sækir sjálfur leiki sem eru í gangi — engin lið eða deildir þarf að velja.</p>
       <div class="status-strip" id="statusStrip"><span>Hleð gögn…</span></div>
     </header>
 
@@ -33,22 +33,16 @@
           <button class="tab" data-filter="upcoming">Næst</button>
           <button class="tab" data-filter="results">Úrslit</button>
           <button class="tab" data-filter="all">Allt</button>
-          <button class="tab" data-filter="mine">Mín lið</button>
-          <button class="tab" data-filter="watch">Mín vakt</button>
         </div>
         <div class="search-row">
           <label class="search-label">
             <span>Leita</span>
             <input id="searchInput" type="search" placeholder="Lið, völlur eða deild…" autocomplete="off" />
           </label>
-          <label class="search-label compact">
-            <span>Mín lið</span>
-            <input id="teamsInput" type="text" placeholder="Selfoss, Víkingur…" />
-          </label>
-          <label class="search-label compact">
-            <span>Mínar deildir</span>
-            <input id="leaguesInput" type="text" placeholder="2. deild, 3. deild, 4. deild, 5. deild…" />
-          </label>
+          <div class="auto-live-note">
+            <span>Sjálfvirk live-vakt</span>
+            <strong>2., 3., 4. og 5. deild karla</strong>
+          </div>
         </div>
       </section>
 
@@ -62,7 +56,6 @@
       <section class="live-center" id="liveCenter" aria-live="polite"></section>
       <section class="matchday-dashboard" id="matchdayDashboard" aria-live="polite"></section>
       <section class="topten-dashboard" id="topTenDashboard" aria-live="polite"></section>
-      <section class="watch-dashboard" id="watchDashboard" aria-live="polite"></section>
       <section class="daily-stars" id="dailyStars" aria-live="polite"></section>
       <section class="league-picker" id="leagueStrip" aria-label="Veldu deild"></section>
       <section class="competition-overview" id="competitionOverview" aria-live="polite"></section>
@@ -70,7 +63,7 @@
       <section class="empty hidden" id="emptyState">
         <div>🔎</div>
         <h2>Engir leikir fundust í þessari síu</h2>
-        <p>Prófaðu að velja „Allt“, hreinsa leitina eða bæta við fleiri liðum í „Mín lið“.</p>
+        <p>Prófaðu „Næst“, „Allt“, hreinsaðu leitina eða ýttu á Uppfæra.</p>
       </section>
     </main>
   </div>
