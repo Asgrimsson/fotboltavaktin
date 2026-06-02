@@ -1,4 +1,4 @@
-const CACHE = 'fotboltavaktin-v2.3.0';
+const CACHE = 'fotboltavaktin-v2.4.0';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.webmanifest', '/assets/icon-192.svg', '/assets/icon-512.svg'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
@@ -11,5 +11,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.pathname.includes('/.netlify/functions/')) return;
-  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
+  event.respondWith(
+    fetch(event.request).then(resp => {
+      const copy = resp.clone();
+      caches.open(CACHE).then(cache => cache.put(event.request, copy));
+      return resp;
+    }).catch(() => caches.match(event.request))
+  );
 });

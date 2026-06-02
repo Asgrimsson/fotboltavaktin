@@ -443,3 +443,93 @@ h1 { font-size: clamp(2rem, 6vw, 3.4rem); }
   .detail-tabs .tab { padding: 9px 12px; }
   .instant-match-panel { align-items: flex-start; padding: 12px; }
 }
+
+/* v2.4 — símafínpússun + betri leikjaspjöld */
+.match-card { position: relative; }
+.match-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: rgba(134,239,172,.32);
+}
+.match-card.is-live-card::before { background: var(--red); box-shadow: 0 0 18px rgba(251,113,133,.5); }
+.match-card.has-score-card::before { background: var(--blue); }
+.match-card:hover { border-color: rgba(134,239,172,.32); transform: translateY(-1px); transition: transform .16s ease, border-color .16s ease; }
+.match-card .detail-btn { background: rgba(34,197,94,.14); }
+.list-note { border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; background: rgba(34,197,94,.08); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted); }
+.list-note strong { color: var(--green-2); }
+.cards .match-card:first-of-type { margin-top: 2px; }
+.match-dialog { overscroll-behavior: contain; }
+.detail-content { min-height: 160px; }
+@media (max-width: 820px) {
+  .hero-top { flex-direction: column; align-items: flex-start; }
+  .hero-actions { justify-content: flex-start; }
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .match-main { grid-template-columns: 1fr; padding: 13px; gap: 9px; }
+  .time-block {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: auto;
+    gap: 8px;
+    padding: 10px 11px;
+  }
+  .time-block .status-pill { order: 1; }
+  .time-block .time { order: 2; margin-left: auto; }
+  .time-block .date { order: 3; }
+  .teams h2 { font-size: clamp(1.18rem, 6vw, 1.75rem); }
+  .meta { font-size: .9rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .match-footer { padding: 10px 13px; }
+  .footer-actions { width: 100%; justify-content: space-between; }
+  .footer-actions .detail-btn { flex: 1; justify-content: center; }
+}
+@media (max-width: 640px) {
+  .app-shell { width: 100%; padding-left: 8px; padding-right: 8px; }
+  .hero { margin: 0; }
+  .brand { width: 100%; }
+  .hero-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  .hero-actions .ghost-btn:first-child { grid-column: span 2; }
+  .controls { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(18px); }
+  .tabs { display: grid; grid-template-columns: repeat(5, max-content); overflow-x: auto; padding-bottom: 2px; }
+  .tab { font-size: .92rem; }
+  .search-label span { font-size: .82rem; }
+  input { min-height: 44px; padding: 12px; }
+  .metric strong { font-size: 2.15rem; }
+  .metric span { font-size: .88rem; }
+  .section-heading { margin-top: 4px; }
+  .section-heading h2 { font-size: 1.65rem; line-height: 1.05; }
+  .section-heading span { font-size: .88rem; }
+  .live-grid, .stars-grid, .matchday-grid { grid-template-columns: 1fr !important; }
+  .topten-list { grid-template-columns: 1fr !important; }
+  .cards { gap: 10px; }
+  .match-card { border-radius: 20px; }
+  .time-block { border-radius: 15px; }
+  .status-pill { font-size: .72rem; }
+  .time { font-size: 1.15rem; }
+  .date { font-size: .78rem; }
+  .teams h2 { gap: 5px; }
+  .match-footer .source { display: none; }
+  .source-link { display: none; }
+  .footer-actions .detail-btn::after { content: " ›"; }
+  .league-picker, .competition-overview, .daily-stars { margin-top: 10px; }
+  .match-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+  .dialog-inner { padding: 12px 10px 24px; }
+  .dialog-close { position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; width: 44px; height: 44px; background: rgba(15,23,42,.92); }
+  .compact-detail-hero { padding: 12px; padding-right: 56px; }
+  .compact-detail-hero h2 { font-size: clamp(1.35rem, 8vw, 2.1rem); line-height: 1.05; }
+  .compact-detail-hero p { font-size: .9rem; }
+  .detail-tabs { position: sticky; top: 0; z-index: 5; background: rgba(7,17,31,.92); padding: 6px 0; margin: 8px 0 10px; }
+  .two-col, .report-grid { grid-template-columns: 1fr !important; }
+  .mini-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .table-wrap { border-radius: 14px; }
+  .standings { min-width: 620px; font-size: .9rem; }
+}

@@ -1,3 +1,3 @@
-# Fótboltavaktin v2.3
+# Fótboltavaktin v2.4
 
-Símahæfari haus, minni texti og hraðari Match Center með skyndiopnun og cache.
+Símafínpússun, betri leikjaspjöld, Allt sýnir alla leiki og Match Center opnast öruggar með hraðopnun.
