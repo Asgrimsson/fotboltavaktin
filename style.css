@@ -266,7 +266,7 @@ a:hover { text-decoration: underline; }
 @media (max-width: 900px) { .stars-grid, .intelligence-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .stars-grid, .intelligence-grid { grid-template-columns: 1fr; } .star-card { min-height: auto; } }
 
-/* v1.1 — Úrvalsdeildir + Leikdagur */
+/* v1.2 — KSÍ-only + meistaraflokkar + hrein leikskýrsla */
 .matchday-dashboard,
 .featured-leagues {
   margin: 18px 0;

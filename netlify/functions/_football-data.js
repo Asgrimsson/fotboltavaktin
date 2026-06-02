@@ -3,7 +3,6 @@ const cheerio = require('cheerio');
 const SOURCES = {
   ksi: 'https://www.ksi.is/leikir-og-urslit/felagslid/',
   ksiCompetitions: 'https://www.ksi.is/oll-mot/',
-  fotbolti: 'https://m.fotbolti.net/',
   urslit: 'https://www.urslit.net/'
 };
 
@@ -29,7 +28,7 @@ const MONTHS = {
   'desember': 11, 'des': 11
 };
 
-const DAY_RE = /^(Mán|Man|Þri|Thri|Mið|Mid|Fim|Fös|Fos|Lau|Sun)\s+(\d{1,2})\.\s+([A-Za-zÁÉÍÓÚÝÞÆÖÐáéíóúýþæöð]+)\s+(\d{1,2}:\d{2})/i;
+const DAY_RE = /^((?:Mán|Man|Þri|Thri|Mið|Mid|Fim|Fös|Fos|Lau|Sun|mánudagur|manudagur|þriðjudagur|thridjudagur|miðvikudagur|midvikudagur|fimmtudagur|föstudagur|fostudagur|laugardagur|sunnudagur))\s+(\d{1,2})\.\s+([A-Za-zÁÉÍÓÚÝÞÆÖÐáéíóúýþæöð]+)\s+(\d{1,2}:\d{2})/i;
 const DATE_ONLY_RE = /^(\d{1,2})\.\s+([A-Za-zÁÉÍÓÚÝÞÆÖÐáéíóúýþæöð]+)$/i;
 const DATE_LINE_RE = /^(mánudagur|þriðjudagur|miðvikudagur|fimmtudagur|föstudagur|laugardagur|sunnudagur)\s+\d{1,2}\.\s+[a-záéíóúýþæöð]+/i;
 
@@ -107,7 +106,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/0.3 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/1.2 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -149,6 +148,25 @@ function getCompetitionMeta(linkMap, competition) {
 function isUsefulToken(line) {
   const text = clean(line);
   return text && !/^Image:?/i.test(text) && !/^(Sjá mót|Sjá leikskýrslu|Atburðir|Leikskýrsla|Staða|Innbyrðis)$/i.test(text);
+}
+
+function looksLikeGroupLine(line) {
+  const text = clean(line);
+  return /^(?:[A-ZÁÉÍÓÚÝÞÆÖÐ])\s*riðill$/i.test(text) || /^[A-ZÁÉÍÓÚÝÞÆÖÐ]\s+riðill$/i.test(text) || /^riðill\s+[A-ZÁÉÍÓÚÝÞÆÖÐ0-9]+$/i.test(text);
+}
+
+function isYouthCompetitionName(name) {
+  const text = normalizeKey(name);
+  // Fjarlægjum yngri flokka frá 2. flokki niður í 5. flokk, en höldum 2.–5. deildum fullorðinna inni.
+  return /(?:^|\s)(2|3|4|5)\s+flokkur(?:\s|$)/i.test(text);
+}
+
+function isAllowedMatch(match) {
+  if (!match || !match.home || !match.away) return false;
+  if (isYouthCompetitionName(match.competition || '')) return false;
+  const teamText = normalizeKey(`${match.home} ${match.away}`);
+  if (isYouthCompetitionName(teamText)) return false;
+  return true;
 }
 
 function parseTeamsFromWindow(lines, startIndex) {
@@ -217,11 +235,18 @@ function parseKsi(html, options = {}) {
     const start = parseIcelandicDate(tm[2], tm[3], tm[4]);
     const venue = lines[i + 1] || '';
     let competition = clean((lines[i + 2] || '').replace(/^Image:?/i, ''));
-    const parsedTeams = parseTeamsFromWindow(lines, i + 3);
+    let teamStartIndex = i + 3;
+    const possibleGroup = clean(lines[i + 3] || '');
+    if (looksLikeGroupLine(possibleGroup) && !normalizeKey(competition).includes(normalizeKey(possibleGroup))) {
+      competition = clean(`${competition} ${possibleGroup}`);
+      teamStartIndex = i + 4;
+    }
+    const parsedTeams = parseTeamsFromWindow(lines, teamStartIndex);
     const home = parsedTeams.home;
     const away = parsedTeams.away;
     if (!home || !away) continue;
     if (!competition || /^[-–—]$/.test(competition)) competition = options.name || '';
+    if (isYouthCompetitionName(competition)) continue;
     const meta = getCompetitionMeta(competitionLinks, competition);
     const officialMeta = options.id && normalizeKey(options.name || '') === normalizeKey(competition) ? options : null;
     const startIso = start ? start.toISOString() : null;
@@ -389,19 +414,15 @@ async function getAllMatches() {
     }
   }
 
-  try {
-    matches = matches.concat(parseFotbolti(await fetchText(SOURCES.fotbolti)));
-  } catch (err) {
-    errors.push(`Fótbolti.net: ${err.message}`);
-  }
-
+  // v1.2: KSÍ er eina gagnaveitan fyrir leiki og leikskýrslur.
+  // Fótbolti.net var fjarlægt sem fallback þar sem fréttalínur gátu ranglega birst sem atburðir.
   try {
     await fetchText(SOURCES.urslit);
   } catch (err) {
     errors.push(`Úrslit.net: ${err.message}`);
   }
 
-  return { matches: sortMatches(uniqueMatches(matches)), errors };
+  return { matches: sortMatches(uniqueMatches(matches.filter(isAllowedMatch))), errors };
 }
 
 function emptyTeam(team) {
@@ -634,16 +655,15 @@ function pickValueAfterLabel(lines, labels) {
 
 function parseReportEvents(lines, home, away) {
   const events = [];
-  const interesting = /(mark|sjálfsmark|gult|rautt|spjald|skipting|víti|penalti|leikmaður|\d{1,3}\s*')/i;
+  const interesting = /(mark|sjálfsmark|gult|rautt|spjald|skipting|víti|penalti)/i;
+  const noise = /(PSG|Liverpool|Arsenal|Man Utd|verðmiða|vill fara|fyrirmyndar|geðveikt|frétt|umfjöllun)/i;
   for (const line of lines) {
     const text = clean(line);
-    if (!text || text.length > 130) continue;
+    if (!text || text.length > 130 || noise.test(text)) continue;
     const minute = text.match(/(\d{1,3})\s*['´]/)?.[1] || '';
-    if (minute || interesting.test(text)) {
-      if (new RegExp(`${home}|${away}`, 'i').test(text) || /(mark|gult|rautt|spjald|skipting|víti|penalti)/i.test(text)) {
-        events.push({ minute, type: eventType(text), text });
-      }
-    }
+    // Atburðir eru aðeins sýndir ef mínúta fylgir. Þetta kemur í veg fyrir að fréttafyrirsagnir verði ranglega lesnar sem leikjaatburðir.
+    if (!minute || !interesting.test(text)) continue;
+    events.push({ minute, type: eventType(text), text });
     if (events.length >= 24) break;
   }
   return events;
@@ -695,7 +715,7 @@ function parseMatchReportHtml(html, match, url) {
 }
 
 async function getMatchReport(match) {
-  const urls = Array.from(new Set([match.matchReportUrl, match.sourceUrl, match.competitionUrl].filter(Boolean)));
+  const urls = Array.from(new Set([match.matchReportUrl, match.sourceUrl, match.competitionUrl].filter(Boolean))).filter(url => /ksi\.is/i.test(url));
   for (const url of urls) {
     try {
       const html = await fetchText(url);

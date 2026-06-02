@@ -130,7 +130,7 @@ function renderStatus() {
   const mine = state.mine.length ? state.mine.join(', ') : 'engin valin';
   const leagues = state.favoriteLeagues.length ? state.favoriteLeagues.join(', ') : 'engar valdar';
   const extra = state.errors.length ? `<span>Viðvörun: ${state.errors.length} heimild gaf ekki full gögn</span>` : '';
-  els.status.innerHTML = `<span>Síðast uppfært ${updated}</span><span>Aðalheimild: KSÍ</span><span>Aukagjafi: Fótbolti.net</span><span>Mín lið: ${escapeHtml(mine)}</span><span>Mínar deildir: ${escapeHtml(leagues)}</span>${extra}`;
+  els.status.innerHTML = `<span>Síðast uppfært ${updated}</span><span>Aðalheimild: KSÍ</span><span>Yngri flokkar 2.–5. flokkur síaðir út</span><span>Mín lið: ${escapeHtml(mine)}</span><span>Mínar deildir: ${escapeHtml(leagues)}</span>${extra}`;
 }
 function renderMetrics() {
   els.metricNow.textContent = state.matches.filter(m => m.status === 'í gangi').length;
@@ -348,7 +348,7 @@ function renderMatchday() {
   const next = today.filter(isUpcomingMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)))[0];
   const title = today.length ? `${today.length} leikir í dag` : 'Engir leikir í dag í sóttum gögnum';
   els.matchdayDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.1</p><h2>${escapeHtml(title)}</h2></div><span>raðað eftir mikilvægi</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.2</p><h2>${escapeHtml(title)}</h2></div><span>raðað eftir mikilvægi</span></div>
     <div class="matchday-grid">
       <button class="metric action-metric" type="button" data-jump-filter="now"><strong>${live.length}</strong><span>í gangi</span></button>
       <button class="metric action-metric" type="button" data-jump-filter="today"><strong>${today.length}</strong><span>í dag</span></button>
@@ -414,7 +414,7 @@ function renderDailyStars() {
   }
   const busyLeague = Array.from(leagueCounts.entries()).sort((a,b)=>b[1]-a[1])[0];
   els.dailyStars.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.1</p><h2>Stjörnur dagsins</h2></div><span>sjálfvirkt val úr leikjum</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v1.2</p><h2>Stjörnur dagsins</h2></div><span>sjálfvirkt val úr leikjum</span></div>
     <div class="stars-grid">
       <button class="star-card main-star" type="button" data-id="${escapeHtml(pick.id)}"><span>⭐ Leikur dagsins</span><strong>${escapeHtml(pick.home)} – ${escapeHtml(pick.away)}</strong><small>${escapeHtml(shortDateTime(pick))} · ${escapeHtml(pick.competition || '')}</small></button>
       <article class="star-card"><span>⚡ Live núna</span><strong>${live.length}</strong><small>leikir í gangi í dag</small></article>
@@ -450,7 +450,7 @@ function renderCompetitions() {
   const items = state.competitions.length ? state.competitions : Array.from(new Map(state.matches.map(m => [m.competitionKey, { key: m.competitionKey, name: m.competition, matchCount: 1, resultCount: hasScore(m) ? 1 : 0, upcomingCount: hasScore(m) ? 0 : 1, liveCount: m.status === 'í gangi' ? 1 : 0, hasOfficialLink: Boolean(m.competitionUrl), url: m.competitionUrl, id: m.competitionId }])).values()).filter(x => x.key && x.name);
   if (!items.length) { els.competitionOverview.innerHTML = ''; return; }
   els.competitionOverview.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">v1.1</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
+    <div class="section-heading"><div><p class="eyebrow">v1.2</p><h2>Deildarsíður</h2></div><span>${items.length} mót/riðlar fundust</span></div>
     <div class="competition-grid">${items.slice(0, 18).map(item => `
       <article class="competition-card">
         <div><h3>${escapeHtml(item.name)}</h3><p>${item.matchCount || 0} leikir · ${item.resultCount || 0} úrslit · ${item.upcomingCount || 0} framundan</p></div>
@@ -652,7 +652,7 @@ function reportMarkup(report = {}, match = {}) {
       </div>
       <div class="two-col report-columns">
         <section><h4>Atburðir</h4><ul class="event-list">${eventRows}</ul></section>
-        <section><h4>Staða gagna</h4><p class="muted">Vefurinn reynir að lesa dómara, mörk, spjöld, skiptingar og byrjunarlið úr opnum KSÍ/COMET gögnum. Ef skýrsla er ekki birt enn sýnist hér kurteis biðstaða.</p>${link}</section>
+        <section><h4>Staða gagna</h4><p class="muted">Vefurinn reynir að lesa dómara, mörk, spjöld, skiptingar og byrjunarlið úr opnum KSÍ/COMET gögnum. Atburðir eru aðeins sýndir þegar þeir líta út eins og staðfestir leikjaatburðir með mínútu — ekki fréttafyrirsagnir.</p>${link}</section>
       </div>
       <div class="two-col report-columns">
         <section><h4>${escapeHtml(match.home || 'Heimalið')} · byrjunarlið</h4>${lineupList(homeLineup)}</section>
