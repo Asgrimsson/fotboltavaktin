@@ -99,15 +99,35 @@ function renderLeagues() {
     row.count++;
     counts.set(m.competitionKey, row);
   }
-  const items = Array.from(counts.values()).sort((a, b) => b.count - a.count).slice(0, 12);
+  const items = Array.from(counts.values()).sort((a, b) => a.name.localeCompare(b.name, 'is'));
   if (!items.length) { els.leagueStrip.innerHTML = ''; return; }
-  els.leagueStrip.innerHTML = `<button class="league-chip ${state.activeLeague ? '' : 'active'}" data-key="">Allar deildir</button>` + items.map(item =>
-    `<button class="league-chip ${state.activeLeague === item.key ? 'active' : ''}" data-key="${escapeHtml(item.key)}">${escapeHtml(item.name)} <b>${item.count}</b></button>`
-  ).join('');
-  els.leagueStrip.querySelectorAll('.league-chip').forEach(btn => btn.addEventListener('click', () => {
-    state.activeLeague = btn.dataset.key;
+
+  const currentLabel = state.activeLeague
+    ? (items.find(item => item.key === state.activeLeague)?.name || 'Valin deild')
+    : 'Allar deildir';
+
+  els.leagueStrip.innerHTML = `
+    <label class="league-select-label" for="leagueSelect">
+      <span>Deild / riðill</span>
+      <select id="leagueSelect" class="league-select">
+        <option value="">Allar deildir (${state.matches.length})</option>
+        ${items.map(item => `<option value="${escapeHtml(item.key)}" ${state.activeLeague === item.key ? 'selected' : ''}>${escapeHtml(item.name)} (${item.count})</option>`).join('')}
+      </select>
+    </label>
+    <button class="mini-btn clear-league ${state.activeLeague ? '' : 'hidden'}" type="button">Hreinsa val</button>
+    <span class="league-current">Sýni: <b>${escapeHtml(currentLabel)}</b></span>
+  `;
+
+  const select = els.leagueStrip.querySelector('#leagueSelect');
+  select.addEventListener('change', event => {
+    state.activeLeague = event.target.value;
     render();
-  }));
+  });
+  const clear = els.leagueStrip.querySelector('.clear-league');
+  if (clear) clear.addEventListener('click', () => {
+    state.activeLeague = '';
+    render();
+  });
 }
 function renderCards() {
   const items = getFilteredMatches();

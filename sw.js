@@ -1,4 +1,4 @@
-const CACHE = 'fotboltavaktin-v0.3.0';
+const CACHE = 'fotboltavaktin-v0.2.0';
 const ASSETS = ['/', '/index.html', '/style.css', '/app.js', '/manifest.webmanifest', '/assets/icon-192.svg', '/assets/icon-512.svg'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
