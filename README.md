@@ -1,16 +1,20 @@
-# Fótboltavaktin v1.2
+# Fótboltavaktin v1.3
 
-Netlify-ready PWA fyrir íslenskan fótbolta.
+KSÍ-only PWA fyrir íslenska boltann.
 
-## v1.2 lagfæringar
-- KSÍ er eina heimildin fyrir leikjalista/leikskýrslur.
-- Fótbolti.net fallback fjarlægt svo fréttalínur birtist ekki sem atburðir.
-- Yngri flokkar 2.–5. flokkur síaðir út.
-- Betri greining á fullum dagsetningum KSÍ, t.d. „þriðjudagur 2. júní 19:30“.
-- Betri „í gangi“ talning út frá KSÍ leiktíma.
+## Nýtt í v1.3
 
-## Local keyrsla
+- Mínar stillingar: sjálfgefin sýn, kynjasía, meistaraflokkar/fullorðinsdeildir og röðun.
+- Smellanlegar tölur: Í gangi, Í dag, Úrslit og Leikir sóttir.
+- Live núna í Stjörnum dagsins er smellanlegt og opnar leikina sem eru í gangi.
+- Quick actions: fylgjast með Bestu deildum og Lengjudeildum, opna Live núna, endurstilla stillingar.
+- Heldur áfram að sía út 2.–5. flokk og nota KSÍ sem aðalheimild.
+
+## Keyrsla
+
 ```bash
 npm install
 npx netlify dev
 ```
+
+Opna: http://localhost:8888

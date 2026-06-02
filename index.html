@@ -15,13 +15,13 @@
         <div class="brand">
           <div class="ball" aria-hidden="true">⚽</div>
           <div>
-            <p class="eyebrow">Íslenski boltinn · v1.2</p>
+            <p class="eyebrow">Íslenski boltinn · v1.3</p>
             <h1>Fótboltavaktin</h1>
           </div>
         </div>
-        <div class="hero-actions"><button id="installBtn" class="ghost-btn hidden" type="button">Setja á heimaskjá</button><button id="themeBtn" class="ghost-btn" type="button">Ljós stilling</button><button id="refreshBtn" class="ghost-btn" type="button">Uppfæra</button></div>
+        <div class="hero-actions"><button id="installBtn" class="ghost-btn hidden" type="button">Setja á heimaskjá</button><button id="themeBtn" class="ghost-btn" type="button">Ljós stilling</button><button id="settingsBtn" class="ghost-btn" type="button">Mínar stillingar</button><button id="refreshBtn" class="ghost-btn" type="button">Uppfæra</button></div>
       </div>
-      <p class="lead">Persónuleg fótboltamiðstöð með KSÍ-gögnum, leikdegi, virkri síun, meistaraflokkum og Match Intelligence.</p>
+      <p class="lead">Persónuleg fótboltamiðstöð með KSÍ-gögnum, Mínum stillingum, Live lista og Match Intelligence.</p>
       <div class="status-strip" id="statusStrip"><span>Hleð gögn…</span></div>
     </header>
 
@@ -53,10 +53,25 @@
       </section>
 
       <section class="summary-grid" aria-live="polite">
-        <article class="metric"><strong id="metricNow">0</strong><span>í gangi</span></article>
-        <article class="metric"><strong id="metricToday">0</strong><span>í dag</span></article>
-        <article class="metric"><strong id="metricResults">0</strong><span>úrslit</span></article>
-        <article class="metric"><strong id="metricTotal">0</strong><span>leikir sóttir</span></article>
+        <button class="metric action-metric" type="button" data-filter-jump="now"><strong id="metricNow">0</strong><span>í gangi</span></button>
+        <button class="metric action-metric" type="button" data-filter-jump="today"><strong id="metricToday">0</strong><span>í dag</span></button>
+        <button class="metric action-metric" type="button" data-filter-jump="results"><strong id="metricResults">0</strong><span>úrslit</span></button>
+        <button class="metric action-metric" type="button" data-filter-jump="all"><strong id="metricTotal">0</strong><span>leikir sóttir</span></button>
+      </section>
+
+      <section class="settings-panel hidden" id="settingsPanel" aria-label="Mínar stillingar">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">v1.3</p><h2>Mínar stillingar</h2></div><span>Vistað í tækinu þínu</span></div>
+        <div class="settings-grid">
+          <label><span>Sjálfgefin opnunarsýn</span><select id="defaultFilterSelect"><option value="now">Í gangi</option><option value="today">Í dag</option><option value="watch">Mín vakt</option><option value="all">Allt</option></select></label>
+          <label><span>Sýna kyn</span><select id="genderModeSelect"><option value="both">Karlar og konur</option><option value="men">Aðeins karlar</option><option value="women">Aðeins konur</option></select></label>
+          <label class="toggle-label"><input id="mastersOnlyToggle" type="checkbox" /> <span>Aðeins meistaraflokkar / fullorðinsdeildir</span></label>
+          <label class="toggle-label"><input id="importantFirstToggle" type="checkbox" /> <span>Raða minni vakt og úrvalsdeildum efst</span></label>
+        </div>
+        <div class="quick-actions">
+          <button class="mini-btn" type="button" data-quick="top4">Fylgjast með Bestu + Lengju</button>
+          <button class="mini-btn" type="button" data-quick="live">Opna Live núna</button>
+          <button class="mini-btn" type="button" data-quick="clearSettings">Endurstilla stillingar</button>
+        </div>
       </section>
 
       <section class="matchday-dashboard" id="matchdayDashboard" aria-live="polite"></section>
