@@ -1,6 +1,6 @@
 const state = {
   matches: [],
-  activeFilter: 'today',
+  activeFilter: 'upcoming',
   activeLeague: '',
   query: '',
   mine: JSON.parse(localStorage.getItem('fotboltavaktin.mine') || '[]'),
@@ -239,7 +239,10 @@ function renderCards() {
     els.cards.appendChild(node);
   });
 }
-function render() { renderStatus(); renderMetrics(); renderMatchday(); renderLiveCenter(); renderTopTen(); renderWatchDashboard(); renderDailyStars(); renderLeagues(); renderCompetitions(); renderCards(); }
+function syncActiveTabs() {
+  document.querySelectorAll('.controls .tab').forEach(b => b.classList.toggle('active', b.dataset.filter === state.activeFilter));
+}
+function render() { syncActiveTabs(); renderStatus(); renderMetrics(); renderLiveCenter(); renderMatchday(); renderTopTen(); renderWatchDashboard(); renderDailyStars(); renderLeagues(); renderCompetitions(); renderCards(); }
 
 function formIcon(value) {
   const v = String(value || '').toUpperCase();
@@ -370,25 +373,31 @@ function getFeaturedMeta(key) {
 }
 function setFilter(filter) {
   state.activeFilter = filter;
-  document.querySelectorAll('.controls .tab').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+  state.activeLeague = state.activeLeague || '';
   render();
+  const target = filter === 'now' ? (els.liveCenter || els.cards) : els.cards;
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderLiveCenter() {
   if (!els.liveCenter) return;
-  const live = visibleMatches().filter(isLiveMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)));
-  if (!live.length) {
+  const all = visibleMatches();
+  const live = all.filter(isLiveMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)));
+  const next = all.filter(isUpcomingMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0))).slice(0, 5);
+  const showEmpty = state.activeFilter === 'now' || live.length > 0;
+  if (!showEmpty) {
     els.liveCenter.innerHTML = '';
     return;
   }
+  const cards = live.length ? live : next;
   els.liveCenter.innerHTML = `
-    <div class="section-heading live-heading"><div><p class="eyebrow">Live Center v1.6</p><h2>${live.length} leikir í gangi núna</h2></div><span>smelltu á leik til að opna Match Center</span></div>
-    <div class="live-grid">
-      ${live.map(m => `<button class="live-card" type="button" data-id="${escapeHtml(m.id)}">
-        <span class="live-dot">● LIVE · ${escapeHtml(liveMinute(m))}</span>
+    <div class="section-heading live-heading"><div><p class="eyebrow">Live Center v1.7</p><h2>${live.length ? `${live.length} leikir í gangi núna` : 'Enginn leikur í gangi núna'}</h2></div><span>${live.length ? 'smelltu á leik til að opna Match Center' : 'hér birtast live leikir sjálfkrafa þegar þeir byrja'}</span></div>
+    <div class="live-grid ${live.length ? '' : 'is-empty'}">
+      ${cards.length ? cards.map(m => `<button class="live-card ${live.length ? '' : 'next-live'}" type="button" data-id="${escapeHtml(m.id)}">
+        <span class="live-dot">${live.length ? `● LIVE · ${escapeHtml(liveMinute(m))}` : `⏱ Næsti leikur · ${escapeHtml(shortDateTime(m))}`}</span>
         <strong>${escapeHtml(m.home)} – ${escapeHtml(m.away)}</strong>
         <small>${escapeHtml(fmtTime(m.startTime, m.localTime || m.rawTime))} · ${escapeHtml(m.competition || '')} · ${escapeHtml(m.venue || '')}</small>
-      </button>`).join('')}
+      </button>`).join('') : `<article class="live-card live-empty-card"><span class="live-dot">● Live</span><strong>Engir komandi leikir fundust</strong><small>Prófaðu „Allt“, veldu aðra deild eða ýttu á Uppfæra.</small></article>`}
     </div>`;
   els.liveCenter.querySelectorAll('[data-id]').forEach(btn => btn.addEventListener('click', () => openMatch(btn.dataset.id)));
 }
@@ -402,7 +411,7 @@ function renderMatchday() {
   const next = today.filter(isUpcomingMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)))[0];
   const title = today.length ? `${today.length} leikir í dag` : 'Engir leikir í dag í sóttum gögnum';
   els.matchdayDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.6</p><h2>${escapeHtml(title)}</h2></div><span>2.–5. deild karla · fullorðinslið</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Leikdagur v1.7</p><h2>${escapeHtml(title)}</h2></div><span>2.–5. deild karla · fullorðinslið</span></div>
     <div class="matchday-grid">
       <button class="metric action-metric" type="button" data-jump-filter="now"><strong>${live.length}</strong><span>í gangi</span></button>
       <button class="metric action-metric" type="button" data-jump-filter="today"><strong>${today.length}</strong><span>í dag</span></button>
@@ -421,7 +430,7 @@ function renderTopTen() {
     .slice(0, 10);
   if (!list.length) { els.topTenDashboard.innerHTML = ''; return; }
   els.topTenDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Snilld v1.6</p><h2>Top 10 leikir</h2></div><span>live + næstu leikir fyrst</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Snilld v1.7</p><h2>Top 10 leikir</h2></div><span>live + næstu leikir fyrst</span></div>
     <div class="topten-list">${list.map((m, i) => `
       <button class="topten-item" type="button" data-id="${escapeHtml(m.id)}">
         <b>${i + 1}. ${escapeHtml(m.home)} – ${escapeHtml(m.away)}</b>

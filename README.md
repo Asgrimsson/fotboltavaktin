@@ -1,3 +1,1 @@
-# Fótboltavaktin v1.6
-
-KSÍ-only, neðri deildir karla, Live Center og hreinni síun.
+Fótboltavaktin v1.7 — Live Center lagfæring, virkir filterhnappar og sýnilegur live/tómgagnagluggi.
