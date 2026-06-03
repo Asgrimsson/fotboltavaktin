@@ -1,3 +1,1 @@
-# Fótboltavaktin v2.9
-
-Lagfærir stöðutöflur: deildaropnun sýnir fyrst hraðtöflu en uppfærir síðan í rétta opinbera KSÍ töflu eftir mótaauðkenni.
+Fótboltavaktin v3.0 — Speed Polish: hraðari service worker, DocumentFragment rendering, debounce leit og léttari CSS fyrir síma.
