@@ -76,18 +76,23 @@ function featuredCompetitionByName(name) {
 function stripCompetitionFromTeamName(team, competition) {
   let out = clean(team);
   const comp = clean(competition);
+  const lowerLeague = /[2-5]\.??\s*deild\s+karla(?:\s+[AB]\s*riðill)?/i;
   if (comp) {
     const esc = comp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp('^' + esc + '\\s+', 'i'), '');
-    out = out.replace(new RegExp('\\s+' + esc + '$', 'i'), '');
+    out = out.replace(new RegExp('^\\s*' + esc + '\\s+', 'i'), '');
+    out = out.replace(new RegExp('\\s+' + esc + '\\s*$', 'i'), '');
   }
   out = out
-    .replace(/^\d+\s+(?=[A-ZÁÉÍÓÚÝÞÆÖÐ])/i, '')
-    .replace(/\s+(?:[2-5]\.\s*deild\s+karla(?:\s+[AB]\s*riðill)?|[2-5]\.\s*deild\s+karla)$/i, '')
+    .replace(/^\s*\d+\s+(?=[A-ZÁÉÍÓÚÝÞÆÖÐ])/i, '')
+    .replace(/^\s*[2-5]\.??\s*deild\s+karla(?:\s+[AB]\s*riðill)?\s+/i, '')
+    .replace(/\s+[2-5]\.??\s*deild\s+karla(?:\s+[AB]\s*riðill)?\s*$/i, '')
     .replace(/\s+\d+\s*$/,'')
     .trim();
+  // Ef parserinn tók með keppnisheiti bæði fremst og aftast reynum aftur.
+  out = out.replace(/^\s*[2-5]\.??\s*deild\s+karla(?:\s+[AB]\s*riðill)?\s+/i, '').trim();
   return out || clean(team);
 }
+
 
 const MONTHS = {
   'janúar': 0, 'januar': 0, 'jan': 0,
@@ -186,17 +191,26 @@ function parseScore(score) {
   return { home: Number(m[1]), away: Number(m[2]) };
 }
 
+function icelandDayKey(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Atlantic/Reykjavik', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
 function statusFromStart(startIso, score) {
   if (!startIso) return parseScore(score) ? 'lokið' : 'á dagskrá';
   const now = Date.now();
   const start = new Date(startIso).getTime();
-  // v2.8: Live-gluggi: 60 mín fyrir leik og 60 mín eftir venjulegan leiktíma (90 mín) = 150 mín eftir upphaf.
-  // Ef KSÍ sýnir bráðabirgðastöðu á meðan leikur er í gangi má það EKKI gera leikinn sjálfkrafa 'lokið'.
+  if (!Number.isFinite(start)) return parseScore(score) ? 'lokið' : 'á dagskrá';
+  const sameDay = icelandDayKey(startIso) === icelandDayKey(new Date(now));
   const liveStart = start - 60 * 60 * 1000;
-  const end = start + 150 * 60 * 1000;
-  if (now >= liveStart && now <= end) return 'í gangi';
+  const matchEnd = start + 90 * 60 * 1000;
+  const postEnd = start + 150 * 60 * 1000;
+  // v2.9: Leikur frá gær má ekki hanga inni sem live þó score sé til staðar.
+  if (sameDay && now >= liveStart && now <= matchEnd) return 'í gangi';
+  if (sameDay && now > matchEnd && now <= postEnd) return 'nýlokið';
   if (parseScore(score)) return 'lokið';
-  if (now > end) return 'líklega lokið';
+  if (now > postEnd) return 'líklega lokið';
   return 'á eftir';
 }
 
@@ -207,7 +221,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/2.8 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/2.9 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -436,7 +450,7 @@ function parseKsi(html, options = {}) {
       const dateHit = previousUseful(lines, venueHit.index - 1, 8);
       let home = normalizeName(homeHit.line);
       let away = normalizeName(awayHit.line);
-      const competition = canonicalCompetitionName(compHit.line || options.name || '', options);
+      const competition = canonicalCompetitionName(options.name || compHit.line || '', options);
       home = stripCompetitionFromTeamName(home, competition);
       away = stripCompetitionFromTeamName(away, competition);
       const venue = clean(venueHit.line || '');

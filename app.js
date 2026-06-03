@@ -75,24 +75,45 @@ function isUpcomingMatch(match) {
   if (!match.startTime) return match.status !== 'lokið';
   return new Date(match.startTime).getTime() >= Date.now() - 7200000;
 }
-function isLiveMatch(match) {
-  if (match.status === 'í gangi') return true;
-  if (!match.startTime) return false;
+function liveWindowInfo(match) {
+  if (!match?.startTime) return { state: 'unknown', label: 'Á dagskrá', className: 'soon', minute: '' };
   const start = new Date(match.startTime).getTime();
+  if (!Number.isFinite(start)) return { state: 'unknown', label: 'Á dagskrá', className: 'soon', minute: '' };
   const now = Date.now();
-  // v2.8: Live-vaktargluggi: 60 mín fyrir leik og 60 mín eftir áætlaðan 90 mín leik.
-  // Ef KSÍ birtir stöðu leiks á meðan hann er í þessum glugga má það ekki fella hann úr live.
-  return now >= start - 60 * 60 * 1000 && now <= start + 150 * 60 * 1000;
+  const today = isSameIcelandDay(match.startTime);
+  const preStart = start - 60 * 60 * 1000;
+  const matchEnd = start + 90 * 60 * 1000;
+  const postEnd = start + 150 * 60 * 1000;
+  const scored = hasScore(match);
+  if (today && now >= preStart && now <= matchEnd) {
+    return { state: 'live', label: 'LIVE núna', className: 'live', minute: liveMinute(match) };
+  }
+  if (today && now > matchEnd && now <= postEnd) {
+    return { state: 'recent', label: 'Nýlokið', className: 'recent', minute: 'síðustu 60 mín' };
+  }
+  if (scored) return { state: 'result', label: 'Úrslit skráð', className: 'done', minute: match.score || '' };
+  return { state: 'scheduled', label: 'Á dagskrá', className: 'soon', minute: shortDateTime(match) };
+}
+function isLiveMatch(match) {
+  return liveWindowInfo(match).state === 'live';
+}
+function isRecentMatch(match) {
+  return liveWindowInfo(match).state === 'recent';
 }
 function liveMinute(match) {
   if (!match.startTime) return '';
-  const min = Math.max(1, Math.floor((Date.now() - new Date(match.startTime).getTime()) / 60000) + 1);
-  if (min < 1) return `byrjar eftir ${Math.abs(min - 1)} mín`;
+  const raw = Math.floor((Date.now() - new Date(match.startTime).getTime()) / 60000);
+  if (raw < 0) return `byrjar eftir ${Math.abs(raw)} mín`;
+  const min = raw + 1;
   if (min <= 45) return `${min}. mín`;
   if (min <= 60) return 'Hálfleikur / uppbót';
   if (min <= 105) return `${Math.min(90, min - 15)}. mín`;
-  if (min <= 150) return 'nýlokið / skráning í gangi';
-  return 'utan live-glugga';
+  return 'nýlokið';
+}
+function qualityBadge(match) {
+  const info = liveWindowInfo(match);
+  const detail = info.minute && info.state !== 'scheduled' ? ` · ${info.minute}` : '';
+  return `<span class="quality-badge ${escapeHtml(info.className)}">${escapeHtml(info.label + detail)}</span>`;
 }
 function normalizeTeamsInput(value) { return value.split(',').map(s => s.trim()).filter(Boolean); }
 function includesAnyTeam(match, teams) {
@@ -227,8 +248,9 @@ function renderCards() {
     const card = node.querySelector('.match-card');
     const open = node.querySelector('.match-open');
     const detailBtn = node.querySelector('.detail-btn');
-    node.querySelector('.status-pill').textContent = isLiveMatch(match) ? `LIVE · ${liveMinute(match)}` : (match.status || 'á dagskrá');
-    node.querySelector('.status-pill').classList.add(isLiveMatch(match) ? 'live' : pillClass(match.status));
+    const q = liveWindowInfo(match);
+    node.querySelector('.status-pill').textContent = q.label + (q.minute && q.state !== 'scheduled' ? ` · ${q.minute}` : '');
+    node.querySelector('.status-pill').classList.add(q.className || pillClass(match.status));
     node.querySelector('.time').textContent = fmtTime(match.startTime, match.localTime || match.rawTime);
     node.querySelector('.date').textContent = fmtDate(match.startTime) || match.dateLabel || '';
     node.querySelector('.home').textContent = match.home;
@@ -243,6 +265,8 @@ function renderCards() {
     if (isWatchMatch(match)) card.classList.add('watch-hit');
     const smart = smartCardText(match);
     if (smart) metaEl.textContent = `${meta || 'Nánari upplýsingar'} · ${smart}`;
+    const qualitySlot = node.querySelector('.quality-slot');
+    if (qualitySlot) qualitySlot.innerHTML = qualityBadge(match);
     node.querySelector('.source').textContent = match.source || 'Heimild';
     node.querySelector('.source-link').href = match.sourceUrl || '#';
     open.addEventListener('click', () => openMatch(match.id));
@@ -369,7 +393,7 @@ function buildClientCompetitionTable(matchOrMeta) {
   let resultCount = 0;
   for (const m of related) {
     const sc = scoreNumbers(m);
-    if (!sc) continue; // v2.8: óleiknir leikir eiga ekki að búa til falska 0-stiga töflu.
+    if (!sc) continue; // v2.9: óleiknir leikir eiga ekki að búa til falska 0-stiga töflu.
     const h = ensure(m.home), a = ensure(m.away);
     if (!h || !a) continue;
     resultCount++;
@@ -398,7 +422,7 @@ function clientSmartFacts(match, table) {
   const home = clientTeamStats(table, match.home);
   const away = clientTeamStats(table, match.away);
   if (home.rank && away.rank) facts.push(`${home.team} er í ${home.rank}. sæti og ${away.team} í ${away.rank}. sæti í hraðtöflunni.`);
-  if (isLiveMatch(match)) facts.push(`Leikurinn er merktur live: ${liveMinute(match)}.`);
+  { const q = liveWindowInfo(match); if (q.state === 'live') facts.push(`Leikurinn er LIVE núna: ${liveMinute(match)}.`); else if (q.state === 'recent') facts.push('Leikurinn er nýlokinn samkvæmt tímaglugga.'); }
   return facts;
 }
 
@@ -447,7 +471,7 @@ function matchIntelligenceMarkup(data) {
   if (!facts.length) facts.push('Það vantar enn nægileg opinber gögn til að gera sterka leikgreiningu.');
   return `
     <section class="intelligence-card">
-      <div class="section-heading compact-heading"><div><p class="eyebrow">Match Intelligence</p><h3>${escapeHtml(label)}</h3></div><span>v2.8</span></div>
+      <div class="section-heading compact-heading"><div><p class="eyebrow">Match Intelligence</p><h3>${escapeHtml(label)}</h3></div><span>v2.9</span></div>
       <div class="intelligence-grid">
         <article><span>Form ${escapeHtml(home.team)}</span><strong>${hForm} stig</strong><div class="form-row">${(home.form || []).map(formIcon).join('') || '<span class="muted">—</span>'}</div></article>
         <article><span>Form ${escapeHtml(away.team)}</span><strong>${aForm} stig</strong><div class="form-row">${(away.form || []).map(formIcon).join('') || '<span class="muted">—</span>'}</div></article>
@@ -481,10 +505,10 @@ function renderLiveCenter() {
   const today = all.filter(isTodayMatch).length;
   const cards = live.length ? live : next;
   els.liveCenter.innerHTML = `
-    <div class="section-heading live-heading"><div><p class="eyebrow">Sjálfvirk Live Center v2.8</p><h2>${live.length ? `${live.length} leikir í gangi núna` : 'Enginn leikur í gangi núna'}</h2></div><span>${live.length ? 'smelltu á live leik til að opna Match Center' : `${today} leikir í dag · næstu leikir birtast hér þar til live hefst`}</span></div>
+    <div class="section-heading live-heading"><div><p class="eyebrow">Sjálfvirk Live Center v2.9</p><h2>${live.length ? `${live.length} leikir í gangi núna` : 'Enginn leikur í gangi núna'}</h2></div><span>${live.length ? 'smelltu á live leik til að opna Match Center' : `${today} leikir í dag · næstu leikir birtast hér þar til live hefst`}</span></div>
     <div class="live-grid ${live.length ? '' : 'is-empty'}">
       ${cards.length ? cards.map(m => `<button class="live-card ${live.length ? 'is-live' : 'next-live'}" type="button" data-id="${escapeHtml(m.id)}">
-        <span class="live-dot">${live.length ? `● LIVE · ${escapeHtml(liveMinute(m))}` : `⏱ Næsti leikur · ${escapeHtml(shortDateTime(m))}`}</span>
+        <span class="live-dot">${live.length ? `● ${escapeHtml(liveWindowInfo(m).label)} · ${escapeHtml(liveMinute(m))}` : `⏱ ${escapeHtml(liveWindowInfo(m).label)} · ${escapeHtml(shortDateTime(m))}`}</span>
         <strong>${escapeHtml(m.home)} – ${escapeHtml(m.away)}</strong>
         <small>${escapeHtml(fmtTime(m.startTime, m.localTime || m.rawTime))} · ${escapeHtml(m.competition || '')} · ${escapeHtml(m.venue || '')}</small>
       </button>`).join('') : `<article class="live-card live-empty-card"><span class="live-dot">● Live</span><strong>Engir komandi leikir fundust í sóttum KSÍ-gögnum</strong><small>Ýttu á Uppfæra eða prófaðu aftur síðar. Engin handvirk lið/deildir þarf að velja.</small></article>`}
@@ -501,7 +525,7 @@ function renderMatchday() {
   const next = today.filter(isUpcomingMatch).sort((a,b)=>(new Date(a.startTime || 0))-(new Date(b.startTime || 0)))[0];
   const title = today.length ? `${today.length} leikir í dag` : 'Engir leikir í dag í sóttum gögnum';
   els.matchdayDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Leikdagur v2.8</p><h2>${escapeHtml(title)}</h2></div><span>2.–5. deild karla · fullorðinslið</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Leikdagur v2.9</p><h2>${escapeHtml(title)}</h2></div><span>2.–5. deild karla · fullorðinslið</span></div>
     <div class="matchday-grid">
       <button class="metric action-metric" type="button" data-jump-filter="now"><strong>${live.length}</strong><span>í gangi</span></button>
       <button class="metric action-metric" type="button" data-jump-filter="today"><strong>${today.length}</strong><span>í dag</span></button>
@@ -520,7 +544,7 @@ function renderTopTen() {
     .slice(0, 10);
   if (!list.length) { els.topTenDashboard.innerHTML = ''; return; }
   els.topTenDashboard.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Sjálfvirkt toppval v2.8</p><h2>Top 10 leikir</h2></div><span>live + næstu leikir fyrst</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Sjálfvirkt toppval v2.9</p><h2>Top 10 leikir</h2></div><span>live + næstu leikir fyrst</span></div>
     <div class="topten-list">${list.map((m, i) => `
       <button class="topten-item" type="button" data-id="${escapeHtml(m.id)}">
         <b>${i + 1}. ${escapeHtml(m.home)} – ${escapeHtml(m.away)}</b>
@@ -551,7 +575,7 @@ function renderDailyStars() {
   }
   const busyLeague = Array.from(leagueCounts.entries()).sort((a,b)=>b[1]-a[1])[0];
   els.dailyStars.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v2.8</p><h2>Stjörnur dagsins</h2></div><span>neðri deildir karla · smelltu á Live núna</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Fótboltamiðstöðin v2.9</p><h2>Stjörnur dagsins</h2></div><span>neðri deildir karla · smelltu á Live núna</span></div>
     <div class="stars-grid">
       <button class="star-card main-star" type="button" data-id="${escapeHtml(pick.id)}"><span>⭐ Leikur dagsins</span><strong>${escapeHtml(pick.home)} – ${escapeHtml(pick.away)}</strong><small>${escapeHtml(shortDateTime(pick))} · ${escapeHtml(pick.competition || '')}</small></button>
       <button class="star-card" type="button" data-jump-filter="now"><span>⚡ Live núna</span><strong>${live.length}</strong><small>${live.length ? 'smelltu til að sjá leikina' : 'enginn leikur í gangi núna'}</small></button>
@@ -574,7 +598,7 @@ function renderWatchDashboard() {
     return;
   }
   els.watchDashboard.innerHTML = `
-    <div class="section-heading compact-heading"><div><p class="eyebrow">v2.8</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
+    <div class="section-heading compact-heading"><div><p class="eyebrow">v2.9</p><h2>Mín vakt</h2></div><span>${watch.length} leikir passa við valið þitt</span></div>
     <div class="watch-grid">
       <article class="watch-card live"><strong>${live.length}</strong><span>í gangi hjá mínum liðum/deildum</span></article>
       <article class="watch-card"><strong>${today.length}</strong><span>í dag í minni vakt</span></article>
@@ -590,7 +614,7 @@ function renderCompetitions() {
   items = items.filter(item => /(^|\s)(2|3|4|5)\.??\s*deild\s+karla/i.test(item.name || '') && !/besta\s+deild|lengjudeild|flokkur|kvenna/i.test(item.name || ''));
   if (!items.length) { els.competitionOverview.innerHTML = ''; return; }
   els.competitionOverview.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">v2.8</p><h2>Neðri deildir</h2></div><span>${items.length} mót/riðlar fundust</span></div>
+    <div class="section-heading"><div><p class="eyebrow">v2.9</p><h2>Neðri deildir</h2></div><span>${items.length} mót/riðlar fundust</span></div>
     <div class="competition-grid">${items.slice(0, 18).map(item => `
       <article class="competition-card">
         <div><h3>${escapeHtml(item.name)}</h3><p>${item.matchCount || 0} leikir · ${item.resultCount || 0} úrslit · ${item.upcomingCount || 0} framundan</p></div>
@@ -617,7 +641,7 @@ function setDetailTab(name) {
 function quickMatchMarkup(m) {
   return `
     <header class="detail-hero compact-detail-hero">
-      <span class="status-pill ${isLiveMatch(m) ? 'live' : pillClass(m.status)}">${escapeHtml(isLiveMatch(m) ? 'í gangi' : (m.status || 'á dagskrá'))}</span>
+      <span class="status-pill ${liveWindowInfo(m).className}">${escapeHtml(liveWindowInfo(m).label)}</span>
       <h2>${escapeHtml(m.home)} <span>${escapeHtml(m.score || '–')}</span> ${escapeHtml(m.away)}</h2>
       <p>${escapeHtml(m.competition || 'Óþekkt keppni')} · ${escapeHtml(m.venue || 'Völlur ekki skráður')} · ${escapeHtml(fmtDate(m.startTime) || m.dateLabel || '')} ${escapeHtml(fmtTime(m.startTime, m.localTime || m.rawTime))}</p>
     </header>
@@ -640,7 +664,7 @@ function renderMatchDetail(data) {
   const awayStats = data.teamStats?.away || { team: m.away };
   els.detail.innerHTML = `
       <header class="detail-hero compact-detail-hero">
-        <span class="status-pill ${isLiveMatch(m) ? 'live' : pillClass(m.status)}">${escapeHtml(isLiveMatch(m) ? `LIVE · ${liveMinute(m)}` : (m.status || 'á dagskrá'))}</span>
+        <span class="status-pill ${liveWindowInfo(m).className}">${escapeHtml(liveWindowInfo(m).label)}${liveWindowInfo(m).minute && liveWindowInfo(m).state !== 'scheduled' ? ' · ' + escapeHtml(liveWindowInfo(m).minute) : ''}</span>
         <h2>${escapeHtml(m.home)} <span>${escapeHtml(m.score || '–')}</span> ${escapeHtml(m.away)}</h2>
         <p>${escapeHtml(m.competition || 'Óþekkt keppni')} · ${escapeHtml(m.venue || 'Völlur ekki skráður')} · ${escapeHtml(fmtDate(m.startTime) || m.dateLabel || '')} ${escapeHtml(fmtTime(m.startTime, m.localTime || m.rawTime))}</p>
       </header>
@@ -697,7 +721,7 @@ async function openMatch(id) {
 
   // Sækjum dýrari gögn í bakgrunni, en látum þau aldrei tefja gluggann.
   try {
-    const data = await fetchJsonWithTimeout(`/.netlify/functions/match-detail?id=${encodeURIComponent(id)}`, 5500);
+    const data = await fetchJsonWithTimeout(`/.netlify/functions/match-detail?id=${encodeURIComponent(id)}`, 10000);
     state.detailCache.set(id, { time: Date.now(), data });
     // Uppfæra aðeins ef sami leikur er enn opinn.
     const title = els.detail.querySelector('.detail-hero h2')?.textContent || '';
@@ -771,13 +795,13 @@ async function openCompetition(meta) {
     return;
   }
 
-  // v2.8: Sýnum ekki falska hraðtöflu með 0 stigum. Ef engin úrslit eru í hraðgögnum kemur biðskilaboð.
+  // v2.9: Sýnum ekki falska hraðtöflu með 0 stigum. Ef engin úrslit eru í hraðgögnum kemur biðskilaboð.
   renderLeague(quickTable, quickTable.rows?.length ? 'Hraðtafla birt strax úr staðfestum úrslitum. Sæki opinbera KSÍ töflu í bakgrunni…' : 'Sæki opinbera KSÍ stöðutöflu…');
   try {
     const params = new URLSearchParams({ key: meta.key || '', competition: meta.name || '' });
     if (meta.url) params.set('url', meta.url);
     if (meta.id) params.set('id', meta.id);
-    const data = await fetchJsonWithTimeout(`/.netlify/functions/competition?${params.toString()}`, 9000);
+    const data = await fetchJsonWithTimeout(`/.netlify/functions/competition?${params.toString()}`, 15000);
     if (data.table) {
       state.competitionCache.set(cacheKey, { time: Date.now(), table: data.table });
       const label = data.table.tableType === 'official' ? 'Rétt opinber KSÍ tafla sótt og uppfærð.' : 'Opinber tafla fannst ekki; sýni bestu tiltæku stöðu án falskra 0-stiga raða.';
