@@ -1,3 +1,3 @@
-# Fótboltavaktin v2.5
+# Fótboltavaktin v2.6
 
-Símafínpússun, betri leikjaspjöld, Allt sýnir alla leiki og Match Center opnast öruggar með hraðopnun.
+Lagfærir stöðutöflur: deildaropnun sýnir fyrst hraðtöflu en uppfærir síðan í rétta opinbera KSÍ töflu eftir mótaauðkenni.

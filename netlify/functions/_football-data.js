@@ -218,6 +218,27 @@ function getCompetitionMeta(linkMap, competition) {
   return { name: competition, url: '', id: '', key: slug(competition), source: '' };
 }
 
+function canonicalCompetitionName(rawCompetition, options = {}) {
+  // v2.6: Þegar við sækjum beina KSÍ-mótasíðu vitum við nákvæmlega hvaða deild/riðill er í gangi.
+  // Þá má ekki leyfa nærliggjandi textalínum í HTML að búa til röng keppnisheiti og rangar töflur.
+  if (options && options.id && options.name) return clean(options.name);
+  return clean(rawCompetition || options.name || '');
+}
+
+function canonicalCompetitionMeta(rawCompetition, linkMap, options = {}) {
+  const competition = canonicalCompetitionName(rawCompetition, options);
+  if (options && options.id && options.name) {
+    return {
+      name: competition,
+      url: options.url || `https://www.ksi.is/oll-mot/mot?id=${options.id}`,
+      id: String(options.id || ''),
+      key: slug(competition),
+      source: 'KSÍ'
+    };
+  }
+  return getCompetitionMeta(linkMap, competition);
+}
+
 
 function isUsefulToken(line) {
   const text = clean(line);
@@ -386,17 +407,16 @@ function parseKsi(html, options = {}) {
       const dateHit = previousUseful(lines, venueHit.index - 1, 8);
       const home = normalizeName(homeHit.line);
       const away = normalizeName(awayHit.line);
-      const competition = clean(compHit.line || options.name || '');
+      const competition = canonicalCompetitionName(compHit.line || options.name || '', options);
       const venue = clean(venueHit.line || '');
       const start = parseIcelandicDate(quickTime[2], quickTime[3], quickTime[1]);
       const startIso = start ? start.toISOString() : null;
       const rawTime = clean(`${dateHit.line || currentDateLabel} ${quickTime[1]}`);
       if (home && away && competition && !/^(Sjá|Veldu|Næstu|Nýjustu)/i.test(home + away + competition)) {
-        const meta = getCompetitionMeta(competitionLinks, competition);
-        const officialMeta = options.id && normalizeKey(options.name || '') === normalizeKey(competition) ? options : null;
+        const meta = canonicalCompetitionMeta(competition, competitionLinks, options);
         const reportUrl = findMatchReportUrl(reportLinks, home, away, quickTime[1]);
-        const compUrl = officialMeta?.url || meta.url || options.url || '';
-        const compId = officialMeta?.id || meta.id || options.id || '';
+        const compUrl = meta.url || options.url || '';
+        const compId = meta.id || options.id || '';
         matches.push({
           id: makeId('ksi', startIso || rawTime, home, away, competition),
           source: 'KSÍ',
@@ -438,13 +458,13 @@ function parseKsi(html, options = {}) {
     const away = parsedTeams.away;
     if (!home || !away) continue;
     if (!competition || /^[-–—]$/.test(competition)) competition = options.name || '';
+    competition = canonicalCompetitionName(competition, options);
     if (isYouthCompetitionName(competition)) continue;
-    const meta = getCompetitionMeta(competitionLinks, competition);
-    const officialMeta = options.id && normalizeKey(options.name || '') === normalizeKey(competition) ? options : null;
+    const meta = canonicalCompetitionMeta(competition, competitionLinks, options);
     const startIso = start ? start.toISOString() : null;
     const reportUrl = findMatchReportUrl(reportLinks, home, away, tm[4]);
-    const compUrl = officialMeta?.url || meta.url || options.url || '';
-    const compId = officialMeta?.id || meta.id || options.id || '';
+    const compUrl = meta.url || options.url || '';
+    const compId = meta.id || options.id || '';
 
     matches.push({
       id: makeId('ksi', startIso || rawTime, home, away, competition),

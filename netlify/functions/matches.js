@@ -11,7 +11,7 @@ exports.handler = async () => {
       },
       body: JSON.stringify({
         ok: true,
-        version: '2.5.0',
+        version: '2.6.0',
         updatedAt: new Date().toISOString(),
         count: matches.length,
         sources: SOURCES,
