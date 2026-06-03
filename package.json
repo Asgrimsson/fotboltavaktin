@@ -1,8 +1,8 @@
 {
   "name": "fotboltavaktin",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
-  "description": "Fótboltavaktin v2.7 - live-gluggi og réttar KSÍ stöðutöflur.",
+  "description": "Fótboltavaktin v2.8 - lagaðar töflur, nákvæmari live-vakt og gagnagreining.",
   "scripts": {
     "dev": "netlify dev",
     "build": "echo 'Static app - no build step'"

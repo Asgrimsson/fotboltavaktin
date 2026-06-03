@@ -190,7 +190,7 @@ function statusFromStart(startIso, score) {
   if (!startIso) return parseScore(score) ? 'lokið' : 'á dagskrá';
   const now = Date.now();
   const start = new Date(startIso).getTime();
-  // v2.7: Live-gluggi: 60 mín fyrir leik og 60 mín eftir venjulegan leiktíma (90 mín) = 150 mín eftir upphaf.
+  // v2.8: Live-gluggi: 60 mín fyrir leik og 60 mín eftir venjulegan leiktíma (90 mín) = 150 mín eftir upphaf.
   // Ef KSÍ sýnir bráðabirgðastöðu á meðan leikur er í gangi má það EKKI gera leikinn sjálfkrafa 'lokið'.
   const liveStart = start - 60 * 60 * 1000;
   const end = start + 150 * 60 * 1000;
@@ -207,7 +207,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/2.7 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/2.8 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -846,6 +846,40 @@ function officialRowFromCells(cells, fallbackCompetition = '') {
 }
 
 
+
+function officialRowsFromText($, fallbackCompetition = '') {
+  const text = $('body').text();
+  const lines = text.split('\n').map(clean).filter(Boolean);
+  const rows = [];
+  // Leitum aðeins í kringum kafla sem líkist stöðutöflu.
+  const startIndex = lines.findIndex(l => /^#?$/.test(l) || /Lið/.test(l) && /Stig|Mörk|Síðustu/.test(lines.slice(lines.indexOf(l), lines.indexOf(l)+8).join(' ')));
+  const scan = startIndex >= 0 ? lines.slice(Math.max(0, startIndex), startIndex + 260) : lines;
+  for (let i = 0; i < scan.length; i++) {
+    const line = clean(scan[i]);
+    let m = line.match(/^(\d{1,2})\s+(.+?)\s+(\d{1,2})\s+(\d{1,2})\s+(\d{1,2})\s+(\d{1,2})\s+(\d{1,3})\s*[:\-]\s*(\d{1,3})\s+([+\-]?\d{1,3})\s+(\d{1,3})(?:\s+(.*))?$/);
+    if (!m) continue;
+    const row = {
+      rank: Number(m[1]),
+      team: cleanOfficialTeamName(m[2], fallbackCompetition),
+      played: Number(m[3]),
+      won: Number(m[4]),
+      drawn: Number(m[5]),
+      lost: Number(m[6]),
+      gf: Number(m[7]),
+      ga: Number(m[8]),
+      gd: Number(m[9]),
+      points: Number(m[10]),
+      upcoming: 0,
+      form: String(m[11] || '').split(/\s+/).map(normalizeOfficialForm).filter(Boolean).slice(0, 5)
+    };
+    if (!row.team || !Number.isFinite(row.played) || !Number.isFinite(row.points)) continue;
+    row.avgFor = row.played ? +(row.gf / row.played).toFixed(2) : 0;
+    row.avgAgainst = row.played ? +(row.ga / row.played).toFixed(2) : 0;
+    rows.push(row);
+  }
+  return rows;
+}
+
 function parseOfficialKsiTable(html, sourceUrl, fallbackName = '') {
   const $ = cheerio.load(html);
   const pageText = clean($('body').text());
@@ -875,7 +909,10 @@ function parseOfficialKsiTable(html, sourceUrl, fallbackName = '') {
     });
   });
 
-  // v2.7: ekki lesa almennan body-texta sem töflu; það bjó til falskar 0-stiga töflur úr leikjalistum.
+  // v2.8: ef taflan er ekki í <table> heldur renderuð sem texti, reynum varlega textalestur.
+  // Við lesum aðeins línur sem hafa fulla stöðutöfluuppbyggingu: sæti, lið, L/U/J/T, mörk, +/-, stig.
+  if (!rows.length) rows.push(...officialRowsFromText($, competition));
+
   const uniqueRows = [];
   const seenTeams = new Set();
   for (const row of rows) {
