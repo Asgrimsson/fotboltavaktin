@@ -62,6 +62,33 @@ function expandedTeamUrls(urls) {
 }
 
 
+
+function featuredCompetitionById(id) {
+  const wanted = String(id || '').trim();
+  return FEATURED_COMPETITIONS.find(c => String(c.id) === wanted) || null;
+}
+
+function featuredCompetitionByName(name) {
+  const key = normalizeKey(name || '');
+  return FEATURED_COMPETITIONS.find(c => normalizeKey(c.name) === key) || null;
+}
+
+function stripCompetitionFromTeamName(team, competition) {
+  let out = clean(team);
+  const comp = clean(competition);
+  if (comp) {
+    const esc = comp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp('^' + esc + '\\s+', 'i'), '');
+    out = out.replace(new RegExp('\\s+' + esc + '$', 'i'), '');
+  }
+  out = out
+    .replace(/^\d+\s+(?=[A-ZÁÉÍÓÚÝÞÆÖÐ])/i, '')
+    .replace(/\s+(?:[2-5]\.\s*deild\s+karla(?:\s+[AB]\s*riðill)?|[2-5]\.\s*deild\s+karla)$/i, '')
+    .replace(/\s+\d+\s*$/,'')
+    .trim();
+  return out || clean(team);
+}
+
 const MONTHS = {
   'janúar': 0, 'januar': 0, 'jan': 0,
   'febrúar': 1, 'februar': 1, 'feb': 1,
@@ -163,10 +190,10 @@ function statusFromStart(startIso, score) {
   if (!startIso) return parseScore(score) ? 'lokið' : 'á dagskrá';
   const now = Date.now();
   const start = new Date(startIso).getTime();
-  // Live Rescue: byrja 15 mín fyrir leik og halda opið í 180 mínútur.
+  // v2.7: Live-gluggi: 60 mín fyrir leik og 60 mín eftir venjulegan leiktíma (90 mín) = 150 mín eftir upphaf.
   // Ef KSÍ sýnir bráðabirgðastöðu á meðan leikur er í gangi má það EKKI gera leikinn sjálfkrafa 'lokið'.
-  const liveStart = start - 15 * 60 * 1000;
-  const end = start + 180 * 60 * 1000;
+  const liveStart = start - 60 * 60 * 1000;
+  const end = start + 150 * 60 * 1000;
   if (now >= liveStart && now <= end) return 'í gangi';
   if (parseScore(score)) return 'lokið';
   if (now > end) return 'líklega lokið';
@@ -180,7 +207,7 @@ function makeId(source, startTime, home, away, competition, score = '') {
 async function fetchText(url) {
   const res = await fetch(url, {
     headers: {
-      'user-agent': 'Fotboltavaktin/2.2 (+personal school project; polite cache)',
+      'user-agent': 'Fotboltavaktin/2.7 (+personal school project; polite cache)',
       'accept': 'text/html,application/xhtml+xml'
     }
   });
@@ -340,7 +367,9 @@ async function fetchTeamPagesForLive(compHtmls, existingMatches, errors) {
     const batch = unique.slice(i, i + 6);
     const results = await Promise.allSettled(batch.map(async link => {
       const html = await fetchText(link.url);
-      return parseKsi(html, {});
+      const cid = competitionIdFromUrl(link.url);
+      const compMeta = featuredCompetitionById(cid) || {};
+      return parseKsi(html, compMeta);
     }));
     for (const res of results) {
       if (res.status === 'fulfilled') {
@@ -405,9 +434,11 @@ function parseKsi(html, options = {}) {
       const compHit = previousUseful(lines, homeHit.index - 1, 8);
       const venueHit = previousUseful(lines, compHit.index - 1, 8);
       const dateHit = previousUseful(lines, venueHit.index - 1, 8);
-      const home = normalizeName(homeHit.line);
-      const away = normalizeName(awayHit.line);
+      let home = normalizeName(homeHit.line);
+      let away = normalizeName(awayHit.line);
       const competition = canonicalCompetitionName(compHit.line || options.name || '', options);
+      home = stripCompetitionFromTeamName(home, competition);
+      away = stripCompetitionFromTeamName(away, competition);
       const venue = clean(venueHit.line || '');
       const start = parseIcelandicDate(quickTime[2], quickTime[3], quickTime[1]);
       const startIso = start ? start.toISOString() : null;
@@ -454,11 +485,13 @@ function parseKsi(html, options = {}) {
       teamStartIndex = i + 4;
     }
     const parsedTeams = parseTeamsFromWindow(lines, teamStartIndex);
-    const home = parsedTeams.home;
-    const away = parsedTeams.away;
+    let home = parsedTeams.home;
+    let away = parsedTeams.away;
     if (!home || !away) continue;
     if (!competition || /^[-–—]$/.test(competition)) competition = options.name || '';
     competition = canonicalCompetitionName(competition, options);
+    home = stripCompetitionFromTeamName(home, competition);
+    away = stripCompetitionFromTeamName(away, competition);
     if (isYouthCompetitionName(competition)) continue;
     const meta = canonicalCompetitionMeta(competition, competitionLinks, options);
     const startIso = start ? start.toISOString() : null;
@@ -589,14 +622,33 @@ function parseFotbolti(html) {
   return matches.slice(0, 120);
 }
 
+function matchDedupKey(m) {
+  return [m.startTime || m.dateLabel || m.rawTime || '', normalizeKey(m.home), normalizeKey(m.away), normalizeKey(m.competition || '')].join('|');
+}
+
+function matchQuality(m) {
+  let q = 0;
+  if (m.competitionId) q += 4;
+  if (m.competitionUrl) q += 3;
+  if (m.matchReportUrl) q += 2;
+  if (m.sourceUrl && /leikur\?id=/i.test(m.sourceUrl)) q += 2;
+  if (m.home && !/^\d/.test(m.home)) q += 1;
+  if (m.away && !/^\d/.test(m.away)) q += 1;
+  return q;
+}
+
 function uniqueMatches(matches) {
-  const seen = new Set();
-  return matches.filter(m => {
-    const key = [m.source, m.startTime || m.dateLabel || m.rawTime, m.home, m.away, m.competition, m.score].join('|').toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const map = new Map();
+  for (const raw of matches) {
+    const m = { ...raw };
+    m.home = stripCompetitionFromTeamName(m.home, m.competition);
+    m.away = stripCompetitionFromTeamName(m.away, m.competition);
+    if (!m.home || !m.away) continue;
+    const key = matchDedupKey(m);
+    const existing = map.get(key);
+    if (!existing || matchQuality(m) > matchQuality(existing)) map.set(key, m);
+  }
+  return Array.from(map.values());
 }
 
 function sortMatches(matches) {
@@ -693,40 +745,49 @@ function addUpcoming(table, home, away) {
 }
 
 function buildCompetitionTable(matches, competitionKey) {
-  const relevant = matches.filter(m => (m.competitionKey || slug(m.competition)) === competitionKey);
+  const filtered = matches.filter(m => (m.competitionKey || slug(m.competition)) === competitionKey);
   const table = new Map();
-  for (const m of relevant) {
+  let resultCount = 0;
+  for (const m of filtered) {
     const score = parseScore(m.score);
-    if (score) addResult(table, m.home, m.away, score);
-    else addUpcoming(table, m.home, m.away);
+    if (score) {
+      addResult(table, stripCompetitionFromTeamName(m.home, m.competition), stripCompetitionFromTeamName(m.away, m.competition), score);
+      resultCount++;
+    }
   }
+
+  // v2.7: Ekki búa til falska stigatöflu úr óleiknum leikjum. Hún leit út eins og tafla en var bara liðalisti með 0 stig.
+  if (!resultCount) {
+    return {
+      competition: filtered[0]?.competition || 'Tafla',
+      competitionKey,
+      tableType: 'pending',
+      completeOfficialTable: false,
+      sourceNote: 'Engin úrslit fundust til að reikna hraðtöflu. Bíð eftir opinberri KSÍ töflu eða fyrstu úrslitum.',
+      matchCount: filtered.length,
+      resultCount: 0,
+      rows: []
+    };
+  }
+
   const rows = Array.from(table.values()).map(row => ({
     ...row,
     gd: row.gf - row.ga,
     avgFor: row.played ? +(row.gf / row.played).toFixed(2) : 0,
-    avgAgainst: row.played ? +(row.ga / row.played).toFixed(2) : 0,
-    form: row.form.slice(0, 5)
-  })).sort((a, b) =>
-    b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team, 'is')
-  ).map((row, idx) => ({ ...row, rank: idx + 1 }));
-
+    avgAgainst: row.played ? +(row.ga / row.played).toFixed(2) : 0
+  })).sort((a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.team.localeCompare(b.team, 'is')).map((row, i) => ({ ...row, rank: i + 1 }));
   return {
+    competition: filtered[0]?.competition || 'Tafla',
     competitionKey,
-    competition: relevant.find(m => m.competition)?.competition || '',
-    sourceNote: 'Reiknuð tafla úr þeim leikjum/úrslitum sem vefurinn náði að sækja. Notuð sem varaleið ef opinber tafla finnst ekki.',
     tableType: 'calculated',
     completeOfficialTable: false,
-    matchCount: relevant.length,
-    resultCount: relevant.filter(m => parseScore(m.score)).length,
-    sourceUrl: '',
+    sourceNote: 'Hraðtafla reiknuð úr sóttum úrslitum. Opinber KSÍ tafla getur uppfært hana í bakgrunni.',
+    matchCount: filtered.length,
+    resultCount,
     rows
   };
 }
 
-function parseGoals(value) {
-  const m = clean(value).match(/(\d+)\s*[-:]\s*(\d+)/);
-  return m ? { gf: Number(m[1]), ga: Number(m[2]) } : { gf: 0, ga: 0 };
-}
 
 function normalizeOfficialForm(value) {
   const v = clean(value).toUpperCase();
@@ -736,24 +797,38 @@ function normalizeOfficialForm(value) {
   return '';
 }
 
-function officialRowFromCells(cells) {
-  const c = cells.map(clean).filter(Boolean);
-  if (c.length < 8) return null;
-  let offset = 0;
-  let rank = Number(c[0]);
-  if (!Number.isInteger(rank)) { rank = 0; offset = -1; }
-  const team = c[1 + offset];
-  const played = Number(c[2 + offset]);
-  const won = Number(c[3 + offset]);
-  const drawn = Number(c[4 + offset]);
-  const lost = Number(c[5 + offset]);
-  const goals = parseGoals(c[6 + offset]);
-  const gd = Number(String(c[7 + offset]).replace('+', '')) || (goals.gf - goals.ga);
-  const points = Number(c[8 + offset]);
-  if (!team || !Number.isFinite(played) || !Number.isFinite(points)) return null;
-  const form = c.slice(9 + offset).map(normalizeOfficialForm).filter(Boolean).slice(0, 5);
+function cleanOfficialTeamName(team, fallbackCompetition = '') {
+  return stripCompetitionFromTeamName(clean(team).replace(/^\d+\s+(?=[A-ZÁÉÍÓÚÝÞÆÖÐ])/i, ''), fallbackCompetition);
+}
+
+function officialRowFromCells(cells, fallbackCompetition = '') {
+  let c = cells.map(clean).filter(Boolean);
+  if (c.length < 7) return null;
+
+  // Stundum kemur sæti og lið saman í einni frumu: "1 Dalvík/Reynir".
+  if (!/^\d+$/.test(c[0])) {
+    const first = c[0].match(/^(\d+)\s+(.+)$/);
+    if (first) c = [first[1], first[2], ...c.slice(1)];
+  }
+
+  const rank = Number(c[0]);
+  if (!Number.isInteger(rank) || rank < 1 || rank > 30) return null;
+  const team = cleanOfficialTeamName(c[1], fallbackCompetition);
+  if (!team || /^lið$/i.test(team)) return null;
+
+  const nums = c.slice(2);
+  const played = Number(nums[0]);
+  const won = Number(nums[1]);
+  const drawn = Number(nums[2]);
+  const lost = Number(nums[3]);
+  const goals = parseGoals(nums[4]);
+  const gd = Number(String(nums[5] || '').replace('+', '')) || (goals.gf - goals.ga);
+  const points = Number(nums[6]);
+  if (!Number.isFinite(played) || !Number.isFinite(points)) return null;
+  if (played < 0 || played > 60 || points < 0 || points > 180) return null;
+  const form = nums.slice(7).map(normalizeOfficialForm).filter(Boolean).slice(0, 5);
   return {
-    rank: rank || 0,
+    rank,
     team,
     played,
     won: Number.isFinite(won) ? won : 0,
@@ -770,13 +845,15 @@ function officialRowFromCells(cells) {
   };
 }
 
+
 function parseOfficialKsiTable(html, sourceUrl, fallbackName = '') {
   const $ = cheerio.load(html);
   const pageText = clean($('body').text());
+  const competition = fallbackName || clean($('h1').first().text()).replace(/^#\s*/, '') || 'Óþekkt mót';
   if (/Engin tafla er til fyrir þetta mót/i.test(pageText)) {
     return {
-      competition: fallbackName || clean($('h1').first().text()) || 'Óþekkt mót',
-      competitionKey: slug(fallbackName),
+      competition,
+      competitionKey: slug(competition),
       tableType: 'none',
       completeOfficialTable: false,
       sourceUrl,
@@ -786,36 +863,41 @@ function parseOfficialKsiTable(html, sourceUrl, fallbackName = '') {
   }
 
   const rows = [];
-  $('table tr').each((_, tr) => {
-    const cells = $(tr).find('th,td').map((__, cell) => clean($(cell).text())).get();
-    const row = officialRowFromCells(cells);
-    if (row) rows.push(row);
+  $('table').each((_, table) => {
+    const headerText = clean($(table).find('tr').first().text());
+    const tableText = clean($(table).text());
+    const looksLikeStandings = /Lið/i.test(tableText) && /Stig/i.test(tableText) && /(Mörk|\+\/-|Síðustu|Form)/i.test(tableText);
+    if (!looksLikeStandings) return;
+    $(table).find('tr').each((__, tr) => {
+      const cells = $(tr).find('th,td').map((___, cell) => clean($(cell).text())).get();
+      const row = officialRowFromCells(cells, competition);
+      if (row) rows.push(row);
+    });
   });
 
-  // Fallback for cases where the table is rendered in text but not as a plain table.
-  if (!rows.length) {
-    const lines = $('body').text().split('\n').map(clean).filter(Boolean);
-    for (let i = 0; i < lines.length; i++) {
-      if (!/^\d+$/.test(lines[i])) continue;
-      const maybe = lines.slice(i, i + 12);
-      const row = officialRowFromCells(maybe);
-      if (row) rows.push(row);
-    }
+  // v2.7: ekki lesa almennan body-texta sem töflu; það bjó til falskar 0-stiga töflur úr leikjalistum.
+  const uniqueRows = [];
+  const seenTeams = new Set();
+  for (const row of rows) {
+    const key = normalizeKey(row.team);
+    if (!key || seenTeams.has(key)) continue;
+    seenTeams.add(key);
+    uniqueRows.push(row);
   }
 
-  const competition = fallbackName || clean($('h1').first().text()).replace(/^#\s*/, '') || 'Óþekkt mót';
   return {
     competition,
     competitionKey: slug(competition),
-    tableType: rows.length ? 'official' : 'none',
-    completeOfficialTable: rows.length > 0,
+    tableType: uniqueRows.length ? 'official' : 'none',
+    completeOfficialTable: uniqueRows.length > 0,
     sourceUrl,
-    sourceNote: rows.length ? 'Opinber tafla sótt af KSÍ mótasíðu.' : 'Tafla fannst ekki í opnu HTML-gögnum KSÍ fyrir þetta mót.',
+    sourceNote: uniqueRows.length ? 'Opinber tafla sótt af KSÍ mótasíðu.' : 'Opinber KSÍ tafla fannst ekki í HTML-gögnum mótasíðunnar. Sýni ekki falska 0-stiga töflu.',
     matchCount: 0,
     resultCount: 0,
-    rows: rows.map((r, idx) => ({ ...r, rank: r.rank || idx + 1 }))
+    rows: uniqueRows.map((r, idx) => ({ ...r, rank: r.rank || idx + 1 })).sort((a,b)=>a.rank-b.rank)
   };
 }
+
 
 async function getOfficialCompetitionTable(meta = {}) {
   const id = meta.id || competitionIdFromUrl(meta.url);
@@ -980,6 +1062,7 @@ function smartFacts(match, table) {
   const facts = [];
   if (table.tableType === 'official') facts.push('Þessi tafla er sótt sem opinber KSÍ staða fyrir mótið/riðilinn.');
   if (table.tableType === 'none') facts.push('KSÍ birtir ekki stöðutöflu fyrir þetta mót eins og er.');
+  if (table.tableType === 'pending') facts.push('Engin úrslit eru komin í hraðgögnum, þannig að tölfræðin birtist þegar opinber tafla eða úrslit finnast.');
   const home = teamStats(table, match.home);
   const away = teamStats(table, match.away);
   if (home.rank && away.rank) {
